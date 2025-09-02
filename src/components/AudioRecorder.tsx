@@ -218,9 +218,8 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
         {!isRecording && !audioBlob && (
           <button
             onClick={startRecording}
-            className="inline-flex items-center px-4 sm:px-6 py-2 sm:py-3 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors text-sm sm:text-base"
+            className="px-4 sm:px-6 py-2 sm:py-3 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors text-sm sm:text-base text-center"
           >
-            <Mic className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
             Start Recording
           </button>
         )}
