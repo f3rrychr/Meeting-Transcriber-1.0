@@ -170,15 +170,6 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Remarks
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Status
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        <div className="flex items-center">
-                          <FileText className="w-4 h-4 mr-1" />
-                          Source
-                        </div>
-                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -194,47 +185,19 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
                           <div className="flex items-center">
-                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-2">
-                              <User className="w-4 h-4 text-blue-600" />
-                            </div>
                             {item.assignee}
                           </div>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                          <div className="flex items-center">
-                            <Calendar className="w-4 h-4 mr-2 text-gray-400" />
-                            <span className={`font-medium ${
-                              item.status === 'overdue' ? 'text-red-600' : 
-                              item.status === 'completed' ? 'text-green-600' : 'text-gray-900'
-                            }`}>
-                              {new Date(item.dueDate).toLocaleDateString('en-US', {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric'
-                              })}
-                            </span>
-                          </div>
+                          {new Date(item.dueDate).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          })}
                         </td>
                         <td className="px-4 py-4 text-sm text-gray-700 max-w-xs">
                           <div className="break-words">
                             {item.remarks || '-'}
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm">
-                          {getStatusBadge(item.status)}
-                        </td>
-                        <td className="px-4 py-4 text-sm text-gray-700">
-                          <div className="space-y-1">
-                            <div className="font-medium text-gray-900 truncate max-w-32" title={item.sourceMeeting}>
-                              {item.sourceMeeting}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {new Date(item.sourceDate).toLocaleDateString('en-US', {
-                                month: 'short',
-                                day: 'numeric',
-                                year: 'numeric'
-                              })}
-                            </div>
                           </div>
                         </td>
                       </tr>
