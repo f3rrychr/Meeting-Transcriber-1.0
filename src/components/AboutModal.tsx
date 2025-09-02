@@ -30,7 +30,7 @@ const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
             Meeting Transcriber
           </h3>
           <p className="text-gray-600 mb-4">
-            Version 1.0
+            Version 1.1
           </p>
           <p className="text-sm text-gray-500">
             Audio transcription and summarization tool
