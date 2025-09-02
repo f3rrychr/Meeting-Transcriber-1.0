@@ -7,6 +7,7 @@ interface MenuBarProps {
   onShowExportPrefs: () => void;
   onShowUserGuide: () => void;
   onShowTranscriptionHistory: () => void;
+  onShowActionTracker: () => void;
   onReset: () => void;
   hasContent: boolean;
   onOpenFile: () => void;
@@ -15,6 +16,7 @@ interface MenuBarProps {
 }
 
 const MenuBar: React.FC<MenuBarProps> = ({ onOpenSettings, onShowAbout, onShowExportPrefs, onShowUserGuide, onShowTranscriptionHistory, onReset, hasContent, onOpenFile, onExportTranscript, onExportSummary }) => {
+const MenuBar: React.FC<MenuBarProps> = ({ onOpenSettings, onShowAbout, onShowExportPrefs, onShowUserGuide, onShowTranscriptionHistory, onShowActionTracker, onReset, hasContent, onOpenFile, onExportTranscript, onExportSummary }) => {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
   const handleMenuItemClick = (action: () => void) => {
@@ -44,7 +46,7 @@ const MenuBar: React.FC<MenuBarProps> = ({ onOpenSettings, onShowAbout, onShowEx
       label: 'Dashboard',
       items: [
         { label: 'Transcription Records', action: () => handleMenuItemClick(onShowTranscriptionHistory) },
-        { label: 'Action Tracker', action: () => handleMenuItemClick(() => console.log('Action Tracker clicked')) }
+        { label: 'Action Tracker', action: () => handleMenuItemClick(onShowActionTracker) }
       ]
     },
     {

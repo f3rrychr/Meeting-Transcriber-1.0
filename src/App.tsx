@@ -9,6 +9,7 @@ import AboutModal from './components/AboutModal';
 import ExportPreferencesModal from './components/ExportPreferencesModal';
 import UserGuideModal from './components/UserGuideModal';
 import TranscriptionHistoryModal from './components/TranscriptionHistoryModal';
+import ActionTrackerModal from './components/ActionTrackerModal';
 import AudioUpload from './components/AudioUpload';
 import { TranscriptionStorage } from './utils/storageUtils';
 import { ProcessingState, TranscriptData, SummaryData, ExportPreferences } from './types';
@@ -54,6 +55,7 @@ function App() {
   const [showExportPrefs, setShowExportPrefs] = useState(false);
   const [showUserGuide, setShowUserGuide] = useState(false);
   const [showTranscriptionHistory, setShowTranscriptionHistory] = useState(false);
+  const [showActionTracker, setShowActionTracker] = useState(false);
   const [apiKeys, setApiKeys] = useState(loadAPIKeys());
   const [processingError, setProcessingError] = useState<string | null>(null);
   const [viewingRecord, setViewingRecord] = useState<{ transcript?: TranscriptData; summary?: SummaryData } | null>(null);
@@ -474,6 +476,7 @@ function App() {
         onShowExportPrefs={() => setShowExportPrefs(true)}
         onShowUserGuide={() => setShowUserGuide(true)}
         onShowTranscriptionHistory={() => setShowTranscriptionHistory(true)}
+        onShowActionTracker={() => setShowActionTracker(true)}
         onReset={resetApp}
         hasContent={!!(transcript || summary)}
         onOpenFile={triggerFileSelect}
@@ -611,6 +614,13 @@ function App() {
           onViewTranscription={handleViewTranscription}
           onViewSummary={handleViewSummary}
           onClose={() => setShowTranscriptionHistory(false)}
+        />
+      )}
+
+      {/* Action Tracker Modal */}
+      {showActionTracker && (
+        <ActionTrackerModal
+          onClose={() => setShowActionTracker(false)}
         />
       )}
 
