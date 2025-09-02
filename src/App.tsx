@@ -8,6 +8,7 @@ import SettingsModal from './components/SettingsModal';
 import AboutModal from './components/AboutModal';
 import ExportPreferencesModal from './components/ExportPreferencesModal';
 import UserGuideModal from './components/UserGuideModal';
+import TranscriptionHistoryModal from './components/TranscriptionHistoryModal';
 import AudioUpload from './components/AudioUpload';
 import { ProcessingState, TranscriptData, SummaryData, ExportPreferences } from './types';
 import { exportTranscriptAsDocx, exportSummaryAsDocx, exportTranscriptAsPdf, exportSummaryAsPdf } from './utils/exportUtils';
@@ -51,6 +52,7 @@ function App() {
   const [showAbout, setShowAbout] = useState(false);
   const [showExportPrefs, setShowExportPrefs] = useState(false);
   const [showUserGuide, setShowUserGuide] = useState(false);
+  const [showTranscriptionHistory, setShowTranscriptionHistory] = useState(false);
   const [apiKeys, setApiKeys] = useState(loadAPIKeys());
   const [processingError, setProcessingError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -449,6 +451,7 @@ function App() {
         onShowAbout={() => setShowAbout(true)}
         onShowExportPrefs={() => setShowExportPrefs(true)}
         onShowUserGuide={() => setShowUserGuide(true)}
+        onShowTranscriptionHistory={() => setShowTranscriptionHistory(true)}
         onReset={resetApp}
         hasContent={!!(transcript || summary)}
         onOpenFile={triggerFileSelect}
@@ -577,6 +580,13 @@ function App() {
         <UserGuideModal
           onClose={() => setShowUserGuide(false)}
           onOpenSettings={() => setShowSettings(true)}
+        />
+      )}
+
+      {/* Transcription History Modal */}
+      {showTranscriptionHistory && (
+        <TranscriptionHistoryModal
+          onClose={() => setShowTranscriptionHistory(false)}
         />
       )}
 
