@@ -154,12 +154,6 @@ const AudioUpload: React.FC<AudioUploadProps> = ({ onFileUpload }) => {
 
       {/* Mobile Tab Content */}
       <div className="lg:hidden">
-        {activeTab === 'record' && (
-          <div className="mt-6">
-            <AudioRecorder onRecordingComplete={onFileUpload} />
-          </div>
-        )}
-        
         {activeTab === 'upload' && (
           <div className="mt-6">
             <div
