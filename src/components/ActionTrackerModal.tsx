@@ -146,12 +146,6 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
         </div>
         
         <div className="p-6">
-          {/* Debug Information */}
-          <details className="mb-4 p-3 bg-gray-50 rounded-lg">
-            <summary className="cursor-pointer text-sm font-medium text-gray-700">Debug Information</summary>
-            <pre className="mt-2 text-xs text-gray-600 whitespace-pre-wrap">{debugInfo}</pre>
-          </details>
-
           {meetingRecords.length > 0 ? (
             <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
               <div className="overflow-x-auto">
