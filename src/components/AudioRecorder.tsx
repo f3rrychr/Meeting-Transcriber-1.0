@@ -196,7 +196,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
 
   return (
     <div className="max-w-md w-full mx-auto px-4 sm:px-0">
-      <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 sm:p-8 text-center">
+      <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 sm:p-8 text-center min-h-[400px] flex flex-col justify-center">
         <Mic className="w-12 h-12 sm:w-16 sm:h-16 text-gray-400 mx-auto mb-4 sm:mb-6" />
         
         <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-2">
@@ -209,7 +209,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
 
         {/* Format Selection */}
         {!isRecording && !audioBlob && (
-          <div className="mb-6">
+          <div className="mb-6 flex-shrink-0">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Recording Format
             </label>
