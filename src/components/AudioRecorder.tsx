@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, Square, Play, Pause, Download, Trash2, Clock } from 'lucide-react';
+import { Mic, Square, Play, Pause, Download, X, Clock } from 'lucide-react';
 
 interface AudioRecorderProps {
   onRecordingComplete: (file: File) => void;
@@ -297,8 +297,8 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
                   onClick={deleteRecording}
                   className="flex items-center px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors text-sm"
                 >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Delete
+                  <X className="w-4 h-4 mr-2" />
+                  Cancel
                 </button>
               </div>
 
