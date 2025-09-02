@@ -23,7 +23,10 @@ const TranscriptionHistoryModal: React.FC<TranscriptionHistoryModalProps> = ({
   }, []);
 
   const handleDeleteRecord = (recordId: string) => {
-    if (confirm('Are you sure you want to delete this transcription record?')) {
+    const record = transcriptionRecords.find(r => r.id === recordId);
+    const recordTitle = record?.title || 'this transcription';
+    
+    if (confirm(`Are you sure you want to permanently delete "${recordTitle}"?\n\nThis action cannot be undone and will remove both the transcript and summary from your history.`)) {
       TranscriptionStorage.deleteTranscription(recordId);
       // Reload records after deletion
       const updatedRecords = TranscriptionStorage.getTranscriptions();
