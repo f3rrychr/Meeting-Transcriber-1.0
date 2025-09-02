@@ -42,33 +42,8 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
         } 
       });
       
-      // Determine the best MIME type based on format preference and browser support
-      let mimeType: string;
-      let fileType: string;
-      
-      if (recordingFormat === 'mp3') {
-        if (MediaRecorder.isTypeSupported('audio/mpeg')) {
-          mimeType = 'audio/mpeg';
-          fileType = 'audio/mpeg';
-        } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-          mimeType = 'audio/mp4';
-          fileType = 'audio/mp3';
-        } else {
-          // Fallback to webm and convert later
-          mimeType = 'audio/webm;codecs=opus';
-          fileType = 'audio/mp3';
-        }
-      } else {
-        // WAV format
-        if (MediaRecorder.isTypeSupported('audio/wav')) {
-          mimeType = 'audio/wav';
-          fileType = 'audio/wav';
-        } else {
-          // Fallback to webm
-          mimeType = 'audio/webm;codecs=opus';
-          fileType = 'audio/wav';
-        }
-      }
+      // Use webm format which is widely supported, then convert filename based on preference
+      const mimeType = 'audio/webm;codecs=opus';
       
       const mediaRecorder = new MediaRecorder(stream, { mimeType });
       
@@ -82,7 +57,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
       };
       
       mediaRecorder.onstop = () => {
-        const blob = new Blob(audioChunksRef.current, { type: fileType });
+        const blob = new Blob(audioChunksRef.current, { type: mimeType });
         setAudioBlob(blob);
         
         // Create audio URL for playback
@@ -158,7 +133,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
       const url = URL.createObjectURL(audioBlob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `recording_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.wav`;
+      a.download = `recording_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.${recordingFormat}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -179,8 +154,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
   const processRecording = () => {
     if (audioBlob) {
       // Convert blob to File object
-      const fileExtension = recordingFormat === 'mp3' ? 'mp3' : 'wav';
-      const file = new File([audioBlob], `recording_${Date.now()}.${fileExtension}`, {
+      const file = new File([audioBlob], `recording_${Date.now()}.${recordingFormat}`, {
         type: recordingFormat === 'mp3' ? 'audio/mpeg' : 'audio/wav',
         lastModified: Date.now()
       });
