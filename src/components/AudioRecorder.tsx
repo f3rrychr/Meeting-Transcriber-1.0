@@ -278,7 +278,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
 
         {/* Format Info */}
         <div className="text-xs sm:text-sm text-gray-500 space-y-1 mt-4">
-          <p>Recording format: WAV (high quality)</p>
+          <p>Recording format: WAV, MP3 (high quality)</p>
           <p>Browser microphone access required</p>
         </div>
       </div>
