@@ -207,22 +207,72 @@ const TranscriptionHistoryModal: React.FC<TranscriptionHistoryModalProps> = ({
                           {record.title}
                         </td>
                         <td className="px-4 py-4 text-center">
-                          <button
-                            onClick={() => handleViewTranscription(record)}
-                            className="inline-flex items-center px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition-colors"
-                          >
-                            <Eye className="w-3 h-3 mr-1" />
-                            View
-                          </button>
+                          <div className="relative">
+                            <button
+                              onClick={() => setActiveDropdown(activeDropdown === `transcript-${record.id}` ? null : `transcript-${record.id}`)}
+                              className="inline-flex items-center px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition-colors"
+                            >
+                              <Download className="w-3 h-3 mr-1" />
+                              Download
+                              <ChevronDown className="w-3 h-3 ml-1" />
+                            </button>
+                            {activeDropdown === `transcript-${record.id}` && (
+                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-1 w-20 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
+                                <button 
+                                  onClick={() => handleDownloadTranscript(record, 'txt')} 
+                                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 transition-colors"
+                                >
+                                  TXT
+                                </button>
+                                <button 
+                                  onClick={() => handleDownloadTranscript(record, 'docx')} 
+                                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 transition-colors"
+                                >
+                                  DOCX
+                                </button>
+                                <button 
+                                  onClick={() => handleDownloadTranscript(record, 'pdf')} 
+                                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 transition-colors"
+                                >
+                                  PDF
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-4 text-center">
-                          <button
-                            onClick={() => handleViewSummary(record)}
-                            className="inline-flex items-center px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors"
-                          >
-                            <BookOpen className="w-3 h-3 mr-1" />
-                            View
-                          </button>
+                          <div className="relative">
+                            <button
+                              onClick={() => setActiveDropdown(activeDropdown === `summary-${record.id}` ? null : `summary-${record.id}`)}
+                              className="inline-flex items-center px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors"
+                            >
+                              <Download className="w-3 h-3 mr-1" />
+                              Download
+                              <ChevronDown className="w-3 h-3 ml-1" />
+                            </button>
+                            {activeDropdown === `summary-${record.id}` && (
+                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-1 w-20 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
+                                <button 
+                                  onClick={() => handleDownloadSummary(record, 'txt')} 
+                                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 transition-colors"
+                                >
+                                  TXT
+                                </button>
+                                <button 
+                                  onClick={() => handleDownloadSummary(record, 'docx')} 
+                                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 transition-colors"
+                                >
+                                  DOCX
+                                </button>
+                                <button 
+                                  onClick={() => handleDownloadSummary(record, 'pdf')} 
+                                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 transition-colors"
+                                >
+                                  PDF
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-4 text-center">
                           <button
