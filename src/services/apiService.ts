@@ -17,12 +17,14 @@ export interface APIKeys {
 // OpenAI Whisper API Integration
 export const transcribeAudio = async (file: File, apiKey: string): Promise<TranscriptData> => {
   console.log('transcribeAudio called with file:', file.name, 'size:', file.size);
+  console.log('API key provided:', apiKey ? 'Yes' : 'No', 'starts with sk-:', apiKey?.startsWith('sk-'));
   
   // Add timeout to prevent hanging
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
   
   if (!apiKey || !apiKey.startsWith('sk-')) {
+    console.error('Invalid API key:', { hasKey: !!apiKey, startsWithSk: apiKey?.startsWith('sk-') });
     throw new APIError('Invalid OpenAI API key. Key should start with "sk-"', 401, 'openai');
   }
 
@@ -52,6 +54,11 @@ export const transcribeAudio = async (file: File, apiKey: string): Promise<Trans
   formData.append('timestamp_granularities[]', 'segment');
 
   console.log('Sending request to OpenAI Whisper API...');
+  console.log('FormData contents:', {
+    file: processedFile.name,
+    size: processedFile.size,
+    type: processedFile.type
+  });
   
   try {
     const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {

@@ -74,6 +74,18 @@ function App() {
 
   const handleFileUpload = async (file: File) => {
     console.log('handleFileUpload called with file:', file.name);
+    console.log('File details:', {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      lastModified: file.lastModified
+    });
+    console.log('Current API keys:', {
+      hasOpenAI: !!apiKeys.openai,
+      hasHuggingFace: !!apiKeys.huggingface,
+      openAIValid: apiKeys.openai?.startsWith('sk-'),
+      hfValid: apiKeys.huggingface?.startsWith('hf_')
+    });
     
     // Prevent multiple simultaneous uploads
     if (isProcessing) {
@@ -84,6 +96,15 @@ function App() {
     // Validate API keys before processing
     const validation = validateAPIKeys(apiKeys);
     console.log('API key validation result:', validation);
+    
+    if (!validation.isValid) {
+      console.error('API validation failed:', validation.errors);
+      setProcessingError(`API Keys Required: ${validation.errors.join(', ')}`);
+      setShowSettings(true);
+      return;
+    }
+
+    console.log('Starting file processing with valid API keys...');
     
     if (!validation.isValid) {
       setProcessingError(`API Keys Required: ${validation.errors.join(', ')}`);
@@ -125,9 +146,11 @@ function App() {
   };
   const processAudioFile = async (file: File) => {
     let processingStep = 'initialization';
+    console.log('processAudioFile started for:', file.name);
     try {
       // Step 1: Upload and validate (5%)
       processingStep = 'validation';
+      console.log('Step 1: Validation');
       setProgress(5);
       await new Promise(resolve => setTimeout(resolve, 200));
 
@@ -141,13 +164,25 @@ function App() {
 
       // Step 2: Transcription with OpenAI Whisper (40%)
       processingStep = 'transcription';
+      console.log('Step 2: Starting transcription...');
       setProgress(10);
       console.log('Starting transcription with OpenAI Whisper...');
       let transcriptData;
       try {
+        console.log('Calling transcribeAudio with:', {
+          fileName: file.name,
+          fileSize: file.size,
+          apiKeyLength: apiKeys.openai?.length
+        });
         transcriptData = await transcribeAudio(file, apiKeys.openai);
+        console.log('Transcription successful, received data:', transcriptData);
       } catch (transcriptionError) {
         console.error('Transcription failed:', transcriptionError);
+        console.error('Transcription error details:', {
+          name: transcriptionError instanceof Error ? transcriptionError.name : 'Unknown',
+          message: transcriptionError instanceof Error ? transcriptionError.message : 'Unknown error',
+          stack: transcriptionError instanceof Error ? transcriptionError.stack : 'No stack'
+        });
         throw new Error(`Transcription failed at step ${processingStep}: ${transcriptionError instanceof Error ? transcriptionError.message : 'Unknown error'}`);
       }
       console.log('Transcription completed:', transcriptData);
@@ -155,11 +190,13 @@ function App() {
 
       // Step 3: Speaker Diarization with Hugging Face (70%)
       processingStep = 'speaker diarization';
+      console.log('Step 3: Starting speaker diarization...');
       setProgress(50);
       console.log('Starting speaker diarization...');
       let diarizedTranscript;
       try {
         diarizedTranscript = await diarizeSpeakers(file, transcriptData, apiKeys.huggingface);
+        console.log('Diarization successful:', diarizedTranscript);
       } catch (diarizationError) {
         console.warn('Diarization failed, using original transcript:', diarizationError);
         diarizedTranscript = transcriptData; // Fallback to original transcript
@@ -170,23 +207,32 @@ function App() {
 
       // Step 4: Summary Generation with OpenAI GPT (100%)
       processingStep = 'summary generation';
+      console.log('Step 4: Starting summary generation...');
       setProgress(80);
       console.log('Starting summary generation...');
       let summaryData;
       try {
         summaryData = await generateSummary(diarizedTranscript, apiKeys.openai);
+        console.log('Summary generation successful:', summaryData);
       } catch (summaryError) {
         console.error('Summary generation failed:', summaryError);
+        console.error('Summary error details:', {
+          name: summaryError instanceof Error ? summaryError.name : 'Unknown',
+          message: summaryError instanceof Error ? summaryError.message : 'Unknown error'
+        });
         throw new Error(`Summary generation failed at step ${processingStep}: ${summaryError instanceof Error ? summaryError.message : 'Unknown error'}`);
       }
       console.log('Summary completed:', summaryData);
       setSummary(summaryData);
       setProgress(100);
       
+      console.log('All processing steps completed successfully');
       setProcessingState('completed');
       
       // Save transcription to history
+      console.log('Saving transcription to history...');
       TranscriptionStorage.saveTranscription(file.name, diarizedTranscript, summaryData);
+      console.log('Transcription saved to history');
       
       // Show success notification
       if ('Notification' in window && Notification.permission === 'granted') {
@@ -198,6 +244,11 @@ function App() {
     } catch (error) {
       console.error('Processing error:', error);
       console.error('Processing failed at step:', processingStep);
+      console.error('Full error details:', {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : 'No stack'
+      });
       
       // Ensure we don't reset state unexpectedly
       setProcessingState('error');
