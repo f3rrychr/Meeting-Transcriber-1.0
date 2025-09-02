@@ -153,55 +153,6 @@ const AudioUpload: React.FC<AudioUploadProps> = ({ onFileUpload }) => {
       </div>
 
       {/* Mobile Tab Content */}
-      <div className="lg:hidden">
-        {activeTab === 'upload' && (
-          <div className="mt-6">
-            <div
-              className={`
-                border-2 border-dashed rounded-xl p-6 text-center transition-all duration-200
-                ${isDragOver 
-                  ? 'border-green-400 bg-green-50' 
-                  : 'border-gray-300 hover:border-green-400 hover:bg-green-50'
-                }
-              `}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-            >
-              <FileAudio className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">
-                Upload Meeting Audio
-              </h2>
-              
-              <p className="text-sm text-gray-600 mb-6">
-                Drag and drop your audio file here, or click to browse
-              </p>
-              
-              <div className="space-y-4">
-                <label className="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg cursor-pointer transition-colors text-sm">
-                  <Upload className="w-4 h-4 mr-2" />
-                  Choose Audio File
-                  <input
-                    type="file"
-                    className="hidden"
-                    accept=".mp3,.wav,.aac,.m4a,.ogg"
-                    onChange={handleFileSelect}
-                  />
-                </label>
-                
-                <div className="text-xs text-gray-500 space-y-1">
-                  <p>Supported formats: MP3, WAV, AAC, M4A, OGG</p>
-                  <p>Maximum file size: 250MB (≈3 hours)</p>
-                  <p className="text-amber-600">
-                    <strong>Note:</strong> Files over 25MB will be automatically compressed
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
       
       {error && (
         <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start">
