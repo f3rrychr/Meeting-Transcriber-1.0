@@ -42,9 +42,8 @@ const MenuBar: React.FC<MenuBarProps> = ({ onOpenSettings, onShowAbout, onShowEx
     {
       label: 'Dashboard',
       items: [
-        { label: 'Overview', action: () => handleMenuItemClick(() => console.log('Overview clicked')) },
-        { label: 'Analytics', action: () => handleMenuItemClick(() => console.log('Analytics clicked')) },
-        { label: 'Reports', action: () => handleMenuItemClick(() => console.log('Reports clicked')) }
+        { label: 'Transcription Records', action: () => handleMenuItemClick(() => console.log('Transcription Records clicked')) },
+        { label: 'Action Tracker', action: () => handleMenuItemClick(() => console.log('Action Tracker clicked')) }
       ]
     },
     {
