@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, FileText, Eye, BookOpen, Calendar, Hash } from 'lucide-react';
+import { X, FileText, Eye, BookOpen, Calendar, Hash, Trash2 } from 'lucide-react';
 import { TranscriptionRecord } from '../types';
 import { TranscriptionStorage } from '../utils/storageUtils';
 
@@ -21,6 +21,15 @@ const TranscriptionHistoryModal: React.FC<TranscriptionHistoryModalProps> = ({
     const records = TranscriptionStorage.getTranscriptions();
     setTranscriptionRecords(records);
   }, []);
+
+  const handleDeleteRecord = (recordId: string) => {
+    if (confirm('Are you sure you want to delete this transcription record?')) {
+      TranscriptionStorage.deleteTranscription(recordId);
+      // Reload records after deletion
+      const updatedRecords = TranscriptionStorage.getTranscriptions();
+      setTranscriptionRecords(updatedRecords);
+    }
+  };
 
   const handleViewTranscription = (record: TranscriptionRecord) => {
     onViewTranscription(record);
@@ -79,6 +88,9 @@ const TranscriptionHistoryModal: React.FC<TranscriptionHistoryModalProps> = ({
                       <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Summary
                       </th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Delete
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -113,6 +125,15 @@ const TranscriptionHistoryModal: React.FC<TranscriptionHistoryModalProps> = ({
                           >
                             <BookOpen className="w-3 h-3 mr-1" />
                             View
+                          </button>
+                        </td>
+                        <td className="px-4 py-4 text-center">
+                          <button
+                            onClick={() => handleDeleteRecord(record.id)}
+                            className="inline-flex items-center px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-lg transition-colors"
+                          >
+                            <Trash2 className="w-3 h-3 mr-1" />
+                            Delete
                           </button>
                         </td>
                       </tr>
