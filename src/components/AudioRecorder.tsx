@@ -5,6 +5,8 @@ interface AudioRecorderProps {
   onRecordingComplete: (file: File) => void;
 }
 
+type RecordingFormat = 'wav' | 'mp3';
+
 const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -12,6 +14,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [recordingFormat, setRecordingFormat] = useState<RecordingFormat>('wav');
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -39,9 +42,35 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
         } 
       });
       
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus'
-      });
+      // Determine the best MIME type based on format preference and browser support
+      let mimeType: string;
+      let fileType: string;
+      
+      if (recordingFormat === 'mp3') {
+        if (MediaRecorder.isTypeSupported('audio/mpeg')) {
+          mimeType = 'audio/mpeg';
+          fileType = 'audio/mpeg';
+        } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+          mimeType = 'audio/mp4';
+          fileType = 'audio/mp3';
+        } else {
+          // Fallback to webm and convert later
+          mimeType = 'audio/webm;codecs=opus';
+          fileType = 'audio/mp3';
+        }
+      } else {
+        // WAV format
+        if (MediaRecorder.isTypeSupported('audio/wav')) {
+          mimeType = 'audio/wav';
+          fileType = 'audio/wav';
+        } else {
+          // Fallback to webm
+          mimeType = 'audio/webm;codecs=opus';
+          fileType = 'audio/wav';
+        }
+      }
+      
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
       
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
@@ -53,7 +82,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
       };
       
       mediaRecorder.onstop = () => {
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+        const blob = new Blob(audioChunksRef.current, { type: fileType });
         setAudioBlob(blob);
         
         // Create audio URL for playback
@@ -150,8 +179,9 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
   const processRecording = () => {
     if (audioBlob) {
       // Convert blob to File object
-      const file = new File([audioBlob], `recording_${Date.now()}.wav`, {
-        type: 'audio/wav',
+      const fileExtension = recordingFormat === 'mp3' ? 'mp3' : 'wav';
+      const file = new File([audioBlob], `recording_${Date.now()}.${fileExtension}`, {
+        type: recordingFormat === 'mp3' ? 'audio/mpeg' : 'audio/wav',
         lastModified: Date.now()
       });
       onRecordingComplete(file);
@@ -176,6 +206,39 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
         <p className="text-sm sm:text-base text-gray-600 mb-6 sm:mb-8">
           Record your meeting directly in the browser
         </p>
+
+        {/* Format Selection */}
+        {!isRecording && !audioBlob && (
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Recording Format
+            </label>
+            <div className="flex justify-center space-x-4">
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="format"
+                  value="wav"
+                  checked={recordingFormat === 'wav'}
+                  onChange={(e) => setRecordingFormat(e.target.value as RecordingFormat)}
+                  className="mr-2"
+                />
+                <span className="text-sm text-gray-700">WAV (High Quality)</span>
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="format"
+                  value="mp3"
+                  checked={recordingFormat === 'mp3'}
+                  onChange={(e) => setRecordingFormat(e.target.value as RecordingFormat)}
+                  className="mr-2"
+                />
+                <span className="text-sm text-gray-700">MP3 (Compressed)</span>
+              </label>
+            </div>
+          </div>
+        )}
 
         {/* Recording Controls */}
         {!isRecording && !audioBlob && (
@@ -278,7 +341,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
 
         {/* Format Info */}
         <div className="text-xs sm:text-sm text-gray-500 space-y-1 mt-4">
-          <p>Recording format: WAV, MP3 (high quality)</p>
+          <p>Recording format: {recordingFormat.toUpperCase()} {recordingFormat === 'wav' ? '(High Quality)' : '(Compressed)'}</p>
           <p>Browser microphone access required</p>
         </div>
       </div>
