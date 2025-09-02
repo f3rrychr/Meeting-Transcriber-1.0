@@ -192,23 +192,23 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
                 <input
                   type="radio"
                   name="format"
-                  value="wav"
-                  checked={recordingFormat === 'wav'}
-                  onChange={(e) => setRecordingFormat(e.target.value as RecordingFormat)}
-                  className="mr-2"
-                />
-                <span className="text-sm text-gray-700">WAV (High Quality)</span>
-              </label>
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  name="format"
                   value="mp3"
                   checked={recordingFormat === 'mp3'}
                   onChange={(e) => setRecordingFormat(e.target.value as RecordingFormat)}
                   className="mr-2"
                 />
                 <span className="text-sm text-gray-700">MP3 (Compressed)</span>
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="format"
+                  value="wav"
+                  checked={recordingFormat === 'wav'}
+                  onChange={(e) => setRecordingFormat(e.target.value as RecordingFormat)}
+                  className="mr-2"
+                />
+                <span className="text-sm text-gray-700">WAV (High Quality)</span>
               </label>
             </div>
           </div>
