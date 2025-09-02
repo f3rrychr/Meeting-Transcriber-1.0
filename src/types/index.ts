@@ -65,3 +65,13 @@ export interface ExportPreferences {
   includeSpeakerLabels: boolean;
   includeMetadata: boolean;
 }
+
+export interface TranscriptionRecord {
+  id: string;
+  date: string;
+  title: string;
+  transcript: TranscriptData;
+  summary: SummaryData;
+  fileName: string;
+  createdAt: number;
+}

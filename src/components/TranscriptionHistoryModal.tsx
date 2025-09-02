@@ -1,49 +1,35 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, FileText, Eye, BookOpen, Calendar, Hash } from 'lucide-react';
-
-interface TranscriptionRecord {
-  id: string;
-  date: string;
-  title: string;
-}
+import { TranscriptionRecord } from '../types';
+import { TranscriptionStorage } from '../utils/storageUtils';
 
 interface TranscriptionHistoryModalProps {
   onClose: () => void;
+  onViewTranscription: (record: TranscriptionRecord) => void;
+  onViewSummary: (record: TranscriptionRecord) => void;
 }
 
-const TranscriptionHistoryModal: React.FC<TranscriptionHistoryModalProps> = ({ onClose }) => {
-  // Mock data for demonstration - in a real app, this would come from a database or localStorage
-  const transcriptionRecords: TranscriptionRecord[] = [
-    {
-      id: '1',
-      date: '2024-01-15',
-      title: 'Q1 Planning Meeting'
-    },
-    {
-      id: '2', 
-      date: '2024-01-12',
-      title: 'Client Kickoff Call'
-    },
-    {
-      id: '3',
-      date: '2024-01-10', 
-      title: 'Team Standup'
-    },
-    {
-      id: '4',
-      date: '2024-01-08',
-      title: 'Product Review Session'
-    }
-  ];
+const TranscriptionHistoryModal: React.FC<TranscriptionHistoryModalProps> = ({ 
+  onClose, 
+  onViewTranscription, 
+  onViewSummary 
+}) => {
+  const [transcriptionRecords, setTranscriptionRecords] = useState<TranscriptionRecord[]>([]);
+
+  useEffect(() => {
+    // Load transcription records from localStorage
+    const records = TranscriptionStorage.getTranscriptions();
+    setTranscriptionRecords(records);
+  }, []);
 
   const handleViewTranscription = (record: TranscriptionRecord) => {
-    console.log('View transcription for:', record.title);
-    // TODO: Implement transcription viewing functionality
+    onViewTranscription(record);
+    onClose();
   };
 
   const handleViewSummary = (record: TranscriptionRecord) => {
-    console.log('View summary for:', record.title);
-    // TODO: Implement summary viewing functionality
+    onViewSummary(record);
+    onClose();
   };
 
   return (

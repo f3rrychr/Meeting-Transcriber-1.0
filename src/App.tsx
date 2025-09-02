@@ -10,6 +10,7 @@ import ExportPreferencesModal from './components/ExportPreferencesModal';
 import UserGuideModal from './components/UserGuideModal';
 import TranscriptionHistoryModal from './components/TranscriptionHistoryModal';
 import AudioUpload from './components/AudioUpload';
+import { TranscriptionStorage } from './utils/storageUtils';
 import { ProcessingState, TranscriptData, SummaryData, ExportPreferences } from './types';
 import { exportTranscriptAsDocx, exportSummaryAsDocx, exportTranscriptAsPdf, exportSummaryAsPdf } from './utils/exportUtils';
 import { transcribeAudio, diarizeSpeakers, generateSummary, validateAPIKeys, APIError } from './services/apiService';
@@ -55,6 +56,7 @@ function App() {
   const [showTranscriptionHistory, setShowTranscriptionHistory] = useState(false);
   const [apiKeys, setApiKeys] = useState(loadAPIKeys());
   const [processingError, setProcessingError] = useState<string | null>(null);
+  const [viewingRecord, setViewingRecord] = useState<{ transcript?: TranscriptData; summary?: SummaryData } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [exportPreferences, setExportPreferences] = useState<ExportPreferences>({
     defaultFormat: 'txt',
@@ -180,6 +182,9 @@ function App() {
       setProgress(100);
       
       setProcessingState('completed');
+      
+      // Save transcription to history
+      TranscriptionStorage.saveTranscription(file.name, diarizedTranscript, summaryData);
       
       // Show success notification
       if ('Notification' in window && Notification.permission === 'granted') {
@@ -433,6 +438,23 @@ function App() {
       URL.revokeObjectURL(url);
     }
   };
+
+  const handleViewTranscription = (record: any) => {
+    setTranscript(record.transcript);
+    setSummary(record.summary);
+    setCurrentFile(new File([], record.fileName));
+    setProcessingState('completed');
+    setViewingRecord({ transcript: record.transcript, summary: record.summary });
+  };
+
+  const handleViewSummary = (record: any) => {
+    setTranscript(record.transcript);
+    setSummary(record.summary);
+    setCurrentFile(new File([], record.fileName));
+    setProcessingState('completed');
+    setViewingRecord({ transcript: record.transcript, summary: record.summary });
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header with Logo */}
@@ -586,6 +608,8 @@ function App() {
       {/* Transcription History Modal */}
       {showTranscriptionHistory && (
         <TranscriptionHistoryModal
+          onViewTranscription={handleViewTranscription}
+          onViewSummary={handleViewSummary}
           onClose={() => setShowTranscriptionHistory(false)}
         />
       )}
