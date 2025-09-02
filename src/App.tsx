@@ -410,7 +410,7 @@ function App() {
           <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-green-600 rounded-lg flex items-center justify-center mr-3">
             <FileAudio className="w-5 h-5 text-white" />
           </div>
-          <h1 className="text-xl font-semibold text-gray-900">Meeting Transcriber 1.0</h1>
+          <h1 className="text-xl font-semibold text-gray-900">Meeting Transcriber 1.1</h1>
         </div>
       </header>
 
