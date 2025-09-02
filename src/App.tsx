@@ -14,6 +14,33 @@ import { exportTranscriptAsDocx, exportSummaryAsDocx, exportTranscriptAsPdf, exp
 import { transcribeAudio, diarizeSpeakers, generateSummary, validateAPIKeys, APIError } from './services/apiService';
 import { AudioProcessor } from './utils/audioUtils';
 
+// Local storage keys
+const STORAGE_KEYS = {
+  API_KEYS: 'meeting-transcriber-api-keys'
+};
+
+// Load API keys from localStorage
+const loadAPIKeys = (): { openai: string; huggingface: string } => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEYS.API_KEYS);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (error) {
+    console.warn('Failed to load API keys from localStorage:', error);
+  }
+  return { openai: '', huggingface: '' };
+};
+
+// Save API keys to localStorage
+const saveAPIKeys = (keys: { openai: string; huggingface: string }) => {
+  try {
+    localStorage.setItem(STORAGE_KEYS.API_KEYS, JSON.stringify(keys));
+  } catch (error) {
+    console.warn('Failed to save API keys to localStorage:', error);
+  }
+};
+
 function App() {
   const [processingState, setProcessingState] = useState<ProcessingState>('idle');
   const [progress, setProgress] = useState(0);
@@ -24,10 +51,7 @@ function App() {
   const [showAbout, setShowAbout] = useState(false);
   const [showExportPrefs, setShowExportPrefs] = useState(false);
   const [showUserGuide, setShowUserGuide] = useState(false);
-  const [apiKeys, setApiKeys] = useState({
-    openai: '',
-    huggingface: ''
-  });
+  const [apiKeys, setApiKeys] = useState(loadAPIKeys());
   const [processingError, setProcessingError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [exportPreferences, setExportPreferences] = useState<ExportPreferences>({
@@ -284,6 +308,11 @@ function App() {
     }
   };
 
+  const handleSaveAPIKeys = (keys: { openai: string; huggingface: string }) => {
+    setApiKeys(keys);
+    saveAPIKeys(keys);
+  };
+
   const resetApp = () => {
     console.log('resetApp called');
     setIsProcessing(false);
@@ -524,7 +553,7 @@ function App() {
       {showSettings && (
         <SettingsModal
           apiKeys={apiKeys}
-          onSave={setApiKeys}
+          onSave={handleSaveAPIKeys}
           onClose={() => setShowSettings(false)}
         />
       )}
