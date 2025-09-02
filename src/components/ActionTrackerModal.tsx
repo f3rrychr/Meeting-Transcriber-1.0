@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, CheckSquare, Calendar, User, Hash } from 'lucide-react';
+import { X, CheckSquare, Calendar, User, Hash, FileText } from 'lucide-react';
 import { TranscriptionRecord, ActionItem } from '../types';
 import { TranscriptionStorage } from '../utils/storageUtils';
 
@@ -19,6 +19,7 @@ interface MeetingRecord {
   meetingDate: string;
   actionItem?: ActionItemWithSource;
 }
+
 const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
   const [meetingRecords, setMeetingRecords] = useState<MeetingRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,6 +88,7 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
               meetingDate: record.date || 'Unknown Date'
             };
             allMeetingRecords.push(meetingRecord);
+          }
         });
 
         console.log('Total meeting records extracted:', allMeetingRecords.length);
@@ -186,9 +188,6 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Remarks
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Remarks
-                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -222,9 +221,6 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
                         </td>
                         <td className="px-4 py-4 text-sm text-gray-700">
                           {record.actionItem?.remarks || '-'}
-                        </td>
-                        <td className="px-4 py-4 text-sm text-gray-700">
-                          {item.remarks || '-'}
                         </td>
                       </tr>
                     ))}
@@ -261,8 +257,5 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
     </div>
   );
 };
-
-// Add missing import
-import { FileText } from 'lucide-react';
 
 export default ActionTrackerModal;
