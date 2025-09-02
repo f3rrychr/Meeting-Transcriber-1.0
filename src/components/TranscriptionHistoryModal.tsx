@@ -156,7 +156,7 @@ const TranscriptionHistoryModal: React.FC<TranscriptionHistoryModalProps> = ({
         
         <div className="p-6">
           {transcriptionRecords.length > 0 ? (
-            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden min-h-[500px]">
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-50 border-b border-gray-200">
