@@ -15,7 +15,6 @@ interface MenuBarProps {
   onExportSummary: () => void;
 }
 
-const MenuBar: React.FC<MenuBarProps> = ({ onOpenSettings, onShowAbout, onShowExportPrefs, onShowUserGuide, onShowTranscriptionHistory, onReset, hasContent, onOpenFile, onExportTranscript, onExportSummary }) => {
 const MenuBar: React.FC<MenuBarProps> = ({ onOpenSettings, onShowAbout, onShowExportPrefs, onShowUserGuide, onShowTranscriptionHistory, onShowActionTracker, onReset, hasContent, onOpenFile, onExportTranscript, onExportSummary }) => {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
