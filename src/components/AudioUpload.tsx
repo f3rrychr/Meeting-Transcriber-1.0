@@ -67,34 +67,6 @@ const AudioUpload: React.FC<AudioUploadProps> = ({ onFileUpload }) => {
 
   return (
     <div className="max-w-4xl w-full mx-auto px-4 sm:px-0">
-      {/* Tab Navigation */}
-      <div className="flex justify-center mb-6">
-        <div className="bg-white rounded-lg p-1 shadow-sm border border-gray-200">
-          <button
-            onClick={() => setActiveTab('record')}
-            className={`flex items-center px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              activeTab === 'record'
-                ? 'bg-green-600 text-white shadow-sm'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-            }`}
-          >
-            <Mic className="w-4 h-4 mr-2" />
-            Record Audio
-          </button>
-          <button
-            onClick={() => setActiveTab('upload')}
-            className={`flex items-center px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              activeTab === 'upload'
-                ? 'bg-green-600 text-white shadow-sm'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-            }`}
-          >
-            <Upload className="w-4 h-4 mr-2" />
-            Upload File
-          </button>
-        </div>
-      </div>
-
       {/* Content based on active tab */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left Side - Recording */}
