@@ -87,9 +87,6 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
               meetingDate: record.date || 'Unknown Date'
             };
             allMeetingRecords.push(meetingRecord);
-          } else {
-            debugText += `  Action Items: 0 (no summary or action items)\n`;
-          }
         });
 
         console.log('Total meeting records extracted:', allMeetingRecords.length);
