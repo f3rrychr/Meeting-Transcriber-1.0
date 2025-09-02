@@ -16,41 +16,77 @@ interface ActionItemWithSource extends ActionItem {
 const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
   const [actionItems, setActionItems] = useState<ActionItemWithSource[]>([]);
   const [loading, setLoading] = useState(true);
+  const [debugInfo, setDebugInfo] = useState<string>('');
 
   useEffect(() => {
     const loadActionItems = () => {
       try {
-        console.log('Loading action items from transcription records...');
+        console.log('=== Action Tracker Debug ===');
         
         // Load all transcription records
         const records = TranscriptionStorage.getTranscriptions();
-        console.log('Found transcription records:', records.length);
+        console.log('Raw records from storage:', records);
+        console.log('Number of records found:', records.length);
+        
+        let debugText = `Found ${records.length} transcription records\n`;
         
         const allActionItems: ActionItemWithSource[] = [];
 
-        records.forEach(record => {
-          console.log('Processing record:', record.title, 'Action items:', record.summary?.actionItems?.length || 0);
+        records.forEach((record, recordIndex) => {
+          console.log(`Processing record ${recordIndex + 1}:`, {
+            id: record.id,
+            title: record.title,
+            date: record.date,
+            hasSummary: !!record.summary,
+            hasActionItems: !!(record.summary?.actionItems),
+            actionItemsCount: record.summary?.actionItems?.length || 0
+          });
           
-          if (record.summary && record.summary.actionItems) {
-            record.summary.actionItems.forEach(item => {
-              allActionItems.push({
-                ...item,
+          debugText += `\nRecord ${recordIndex + 1}: ${record.title}\n`;
+          debugText += `  Date: ${record.date}\n`;
+          debugText += `  Has Summary: ${!!record.summary}\n`;
+          
+          if (record.summary && record.summary.actionItems && Array.isArray(record.summary.actionItems)) {
+            debugText += `  Action Items: ${record.summary.actionItems.length}\n`;
+            
+            record.summary.actionItems.forEach((item, itemIndex) => {
+              console.log(`  Action item ${itemIndex + 1}:`, item);
+              
+              const actionItemWithSource: ActionItemWithSource = {
+                task: item.task || 'No task description',
+                assignee: item.assignee || 'Unassigned',
+                dueDate: item.dueDate || 'No due date',
+                remarks: item.remarks || '',
                 sourceId: record.id,
-                sourceMeeting: record.title,
-                sourceDate: record.date
-              });
+                sourceMeeting: record.title || 'Untitled Meeting',
+                sourceDate: record.date || 'Unknown Date'
+              };
+              
+              allActionItems.push(actionItemWithSource);
+              debugText += `    ${itemIndex + 1}. ${item.task} (${item.assignee})\n`;
             });
+          } else {
+            debugText += `  Action Items: 0 (no summary or action items)\n`;
           }
         });
 
-        console.log('Total action items found:', allActionItems.length);
+        console.log('Total action items extracted:', allActionItems.length);
+        console.log('All action items:', allActionItems);
+        
+        debugText += `\nTotal action items found: ${allActionItems.length}`;
+        setDebugInfo(debugText);
 
         // Sort by due date (earliest first)
-        allActionItems.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+        allActionItems.sort((a, b) => {
+          const dateA = new Date(a.dueDate);
+          const dateB = new Date(b.dueDate);
+          return dateA.getTime() - dateB.getTime();
+        });
         
         setActionItems(allActionItems);
       } catch (error) {
         console.error('Error loading action items:', error);
+        setDebugInfo(`Error loading data: ${error instanceof Error ? error.message : 'Unknown error'}`);
       } finally {
         setLoading(false);
       }
@@ -89,6 +125,12 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
         </div>
         
         <div className="p-6">
+          {/* Debug Information */}
+          <details className="mb-4 p-3 bg-gray-50 rounded-lg">
+            <summary className="cursor-pointer text-sm font-medium text-gray-700">Debug Information</summary>
+            <pre className="mt-2 text-xs text-gray-600 whitespace-pre-wrap">{debugInfo}</pre>
+          </details>
+
           {actionItems.length > 0 ? (
             <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
               <div className="overflow-x-auto">
@@ -116,6 +158,9 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
                           Due Date
                         </div>
                       </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Remarks
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -137,12 +182,11 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            {new Date(item.dueDate).toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric'
-                            })}
+                            {item.dueDate}
                           </span>
+                        </td>
+                        <td className="px-4 py-4 text-sm text-gray-700">
+                          {item.remarks || '-'}
                         </td>
                       </tr>
                     ))}
