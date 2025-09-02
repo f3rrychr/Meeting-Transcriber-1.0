@@ -165,7 +165,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
   };
 
   return (
-    <div className="w-full mx-auto px-4 sm:px-0">
+    <div className="max-w-md w-full mx-auto px-4 sm:px-0">
       <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 sm:p-8 text-center">
         <Mic className="w-12 h-12 sm:w-16 sm:h-16 text-gray-400 mx-auto mb-4 sm:mb-6" />
         
