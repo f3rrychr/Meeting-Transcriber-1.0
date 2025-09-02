@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, FileText, Eye, BookOpen, Calendar, Hash, Trash2 } from 'lucide-react';
+import { X, FileText, Download, Calendar, Hash, Trash2, ChevronDown } from 'lucide-react';
 import { TranscriptionRecord } from '../types';
 import { TranscriptionStorage } from '../utils/storageUtils';
+import { exportTranscriptAsDocx, exportTranscriptAsPdf, exportSummaryAsDocx, exportSummaryAsPdf } from '../utils/exportUtils';
 
 interface TranscriptionHistoryModalProps {
   onClose: () => void;
@@ -15,6 +16,7 @@ const TranscriptionHistoryModal: React.FC<TranscriptionHistoryModalProps> = ({
   onViewSummary 
 }) => {
   const [transcriptionRecords, setTranscriptionRecords] = useState<TranscriptionRecord[]>([]);
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
   useEffect(() => {
     // Load transcription records from localStorage
@@ -34,14 +36,106 @@ const TranscriptionHistoryModal: React.FC<TranscriptionHistoryModalProps> = ({
     }
   };
 
-  const handleViewTranscription = (record: TranscriptionRecord) => {
-    onViewTranscription(record);
-    onClose();
+  const handleDownloadTranscript = (record: TranscriptionRecord, format: 'txt' | 'docx' | 'pdf') => {
+    const baseFileName = record.fileName.replace(/\.[^/.]+$/, "");
+    
+    if (format === 'docx') {
+      exportTranscriptAsDocx(record.transcript, baseFileName, true);
+    } else if (format === 'pdf') {
+      exportTranscriptAsPdf(record.transcript, baseFileName, true);
+    } else {
+      // TXT format
+      let content = `Meeting Transcript\n`;
+      content += `==================\n\n`;
+      content += `Meeting: ${record.transcript.meetingTitle}\n`;
+      content += `Date: ${record.transcript.meetingDate}\n`;
+      content += `Duration: ${record.transcript.duration}\n`;
+      content += `Word Count: ${record.transcript.wordCount}\n\n`;
+      content += `Transcript:\n`;
+      content += `-----------\n\n`;
+      
+      record.transcript.speakers.forEach(speaker => {
+        content += `${speaker.id}:\n`;
+        speaker.segments.forEach(segment => {
+          content += `[${segment.timestamp}] ${segment.text}\n`;
+        });
+        content += `\n`;
+      });
+      
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${baseFileName}_transcript.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+    setActiveDropdown(null);
   };
 
-  const handleViewSummary = (record: TranscriptionRecord) => {
-    onViewSummary(record);
-    onClose();
+  const handleDownloadSummary = (record: TranscriptionRecord, format: 'txt' | 'docx' | 'pdf') => {
+    const baseFileName = record.fileName.replace(/\.[^/.]+$/, "");
+    
+    if (format === 'docx') {
+      exportSummaryAsDocx(record.summary, baseFileName);
+    } else if (format === 'pdf') {
+      exportSummaryAsPdf(record.summary, baseFileName);
+    } else {
+      // TXT format
+      let content = `Meeting Summary\n`;
+      content += `===============\n\n`;
+      content += `Meeting: ${record.summary.meetingContext.meetingName}\n`;
+      content += `Date: ${record.summary.meetingContext.meetingDate}\n`;
+      content += `Participants: ${record.summary.meetingContext.participants.join(', ')}\n\n`;
+      
+      content += `Key Points:\n`;
+      content += `-----------\n`;
+      record.summary.keyPoints.forEach((point, index) => {
+        content += `${index + 1}. ${point}\n`;
+      });
+      content += `\n`;
+      
+      content += `Action Items:\n`;
+      content += `-------------\n`;
+      record.summary.actionItems.forEach((item, index) => {
+        content += `${index + 1}. ${item.task}\n`;
+        content += `   PIC: ${item.assignee}\n`;
+        content += `   Due: ${item.dueDate}\n`;
+        if (item.remarks) {
+          content += `   Remarks: ${item.remarks}\n`;
+        }
+        content += `\n`;
+      });
+      
+      content += `Risks & Issues:\n`;
+      content += `---------------\n`;
+      record.summary.risks.forEach((risk, index) => {
+        content += `${index + 1}. [${risk.type}] ${risk.category}: ${risk.item}\n`;
+        if (risk.remarks) {
+          content += `   Remarks: ${risk.remarks}\n`;
+        }
+        content += `\n`;
+      });
+      
+      content += `Next Meeting:\n`;
+      content += `-------------\n`;
+      content += `Meeting: ${record.summary.nextMeetingPlan.meetingName}\n`;
+      content += `Date & Time: ${record.summary.nextMeetingPlan.scheduledDate} at ${record.summary.nextMeetingPlan.scheduledTime}\n`;
+      content += `Agenda: ${record.summary.nextMeetingPlan.agenda}\n\n`;
+      
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${baseFileName}_summary.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+    setActiveDropdown(null);
   };
 
   return (
