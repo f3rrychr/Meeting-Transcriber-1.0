@@ -13,13 +13,19 @@ interface ActionItemWithSource extends ActionItem {
   sourceDate: string;
 }
 
+interface MeetingRecord {
+  sourceId: string;
+  meetingTitle: string;
+  meetingDate: string;
+  actionItem?: ActionItemWithSource;
+}
 const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
-  const [actionItems, setActionItems] = useState<ActionItemWithSource[]>([]);
+  const [meetingRecords, setMeetingRecords] = useState<MeetingRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [debugInfo, setDebugInfo] = useState<string>('');
 
   useEffect(() => {
-    const loadActionItems = () => {
+    const loadMeetingRecords = () => {
       try {
         console.log('=== Action Tracker Debug ===');
         
@@ -30,7 +36,7 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
         
         let debugText = `Found ${records.length} transcription records\n`;
         
-        const allActionItems: ActionItemWithSource[] = [];
+        const allMeetingRecords: MeetingRecord[] = [];
 
         records.forEach((record, recordIndex) => {
           console.log(`Processing record ${recordIndex + 1}:`, {
@@ -62,28 +68,44 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
                 sourceDate: record.date || 'Unknown Date'
               };
               
-              allActionItems.push(actionItemWithSource);
+              const meetingRecord: MeetingRecord = {
+                sourceId: record.id,
+                meetingTitle: record.title || 'Untitled Meeting',
+                meetingDate: record.date || 'Unknown Date',
+                actionItem: actionItemWithSource
+              };
+              
+              allMeetingRecords.push(meetingRecord);
               debugText += `    ${itemIndex + 1}. ${item.task} (${item.assignee})\n`;
             });
+          } else {
+            // Add meeting record even without action items
+            debugText += `  Action Items: 0 (no action items, but adding meeting record)\n`;
+            const meetingRecord: MeetingRecord = {
+              sourceId: record.id,
+              meetingTitle: record.title || 'Untitled Meeting',
+              meetingDate: record.date || 'Unknown Date'
+            };
+            allMeetingRecords.push(meetingRecord);
           } else {
             debugText += `  Action Items: 0 (no summary or action items)\n`;
           }
         });
 
-        console.log('Total action items extracted:', allActionItems.length);
-        console.log('All action items:', allActionItems);
+        console.log('Total meeting records extracted:', allMeetingRecords.length);
+        console.log('All meeting records:', allMeetingRecords);
         
-        debugText += `\nTotal action items found: ${allActionItems.length}`;
+        debugText += `\nTotal meeting records found: ${allMeetingRecords.length}`;
         setDebugInfo(debugText);
 
-        // Sort by due date (earliest first)
-        allActionItems.sort((a, b) => {
-          const dateA = new Date(a.dueDate);
-          const dateB = new Date(b.dueDate);
-          return dateA.getTime() - dateB.getTime();
+        // Sort by meeting date (most recent first)
+        allMeetingRecords.sort((a, b) => {
+          const dateA = new Date(a.meetingDate);
+          const dateB = new Date(b.meetingDate);
+          return dateB.getTime() - dateA.getTime();
         });
         
-        setActionItems(allActionItems);
+        setMeetingRecords(allMeetingRecords);
       } catch (error) {
         console.error('Error loading action items:', error);
         setDebugInfo(`Error loading data: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -92,7 +114,7 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
       }
     };
 
-    loadActionItems();
+    loadMeetingRecords();
   }, []);
 
   if (loading) {
@@ -131,7 +153,7 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
             <pre className="mt-2 text-xs text-gray-600 whitespace-pre-wrap">{debugInfo}</pre>
           </details>
 
-          {actionItems.length > 0 ? (
+          {meetingRecords.length > 0 ? (
             <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full">
@@ -141,6 +163,12 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
                         <div className="flex items-center">
                           <Hash className="w-4 h-4 mr-1" />
                           No
+                        </div>
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <div className="flex items-center">
+                          <FileText className="w-4 h-4 mr-1" />
+                          Meeting Title
                         </div>
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -161,29 +189,42 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Remarks
                       </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Remarks
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {actionItems.map((item, index) => (
-                      <tr key={`${item.sourceId}-${index}`} className="hover:bg-gray-50 transition-colors">
+                    {meetingRecords.map((record, index) => (
+                      <tr key={`${record.sourceId}-${index}`} className="hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                           {index + 1}
                         </td>
                         <td className="px-4 py-4 text-sm text-gray-900">
-                          <div className="max-w-md">
-                            {item.task}
-                          </div>
-                          <div className="text-xs text-gray-500 mt-1">
-                            From: {item.sourceMeeting} ({item.sourceDate})
-                          </div>
+                          <div className="font-medium">{record.meetingTitle}</div>
+                          <div className="text-xs text-gray-500 mt-1">{record.meetingDate}</div>
+                        </td>
+                        <td className="px-4 py-4 text-sm text-gray-900">
+                          {record.actionItem ? (
+                            <div className="max-w-md">{record.actionItem.task}</div>
+                          ) : (
+                            <span className="text-gray-400 italic">No action items</span>
+                          )}
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                          {item.assignee}
+                          {record.actionItem ? record.actionItem.assignee : '-'}
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            {item.dueDate}
-                          </span>
+                          {record.actionItem ? (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              {record.actionItem.dueDate}
+                            </span>
+                          ) : (
+                            '-'
+                          )}
+                        </td>
+                        <td className="px-4 py-4 text-sm text-gray-700">
+                          {record.actionItem?.remarks || '-'}
                         </td>
                         <td className="px-4 py-4 text-sm text-gray-700">
                           {item.remarks || '-'}
@@ -197,12 +238,12 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
           ) : (
             <div className="text-center py-12">
               <CheckSquare className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Action Items Found</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No Meeting Records Found</h3>
               <p className="text-gray-500">
-                Action items from your transcription sessions will appear here.
+                Meeting records from your transcription sessions will appear here.
               </p>
               <p className="text-sm text-gray-400 mt-2">
-                Process some meeting audio files to see action items tracked here.
+                Process some meeting audio files to see meeting records here.
               </p>
             </div>
           )}
@@ -210,7 +251,7 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
         
         <div className="flex justify-between items-center p-6 border-t border-gray-200 bg-gray-50">
           <div className="text-sm text-gray-600">
-            {actionItems.length > 0 ? `Showing ${actionItems.length} action items from previous meetings` : 'No action items to display'}
+            {meetingRecords.length > 0 ? `Showing ${meetingRecords.length} records from previous meetings` : 'No meeting records to display'}
           </div>
           <button
             onClick={onClose}
@@ -223,5 +264,8 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
     </div>
   );
 };
+
+// Add missing import
+import { FileText } from 'lucide-react';
 
 export default ActionTrackerModal;
