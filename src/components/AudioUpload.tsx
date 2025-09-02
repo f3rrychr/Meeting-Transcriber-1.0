@@ -68,14 +68,14 @@ const AudioUpload: React.FC<AudioUploadProps> = ({ onFileUpload }) => {
   return (
     <div className="max-w-4xl w-full mx-auto px-4 sm:px-0">
       {/* Content based on active tab */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Left Side - Recording */}
-        <div className={`${activeTab === 'record' ? 'lg:block' : 'lg:block'}`}>
+        <div>
           <AudioRecorder onRecordingComplete={onFileUpload} />
         </div>
 
         {/* Right Side - File Upload */}
-        <div className={`${activeTab === 'upload' ? 'lg:block' : 'lg:block'}`}>
+        <div>
           <div className="max-w-md w-full mx-auto">
             <div
               className={`
@@ -124,8 +124,6 @@ const AudioUpload: React.FC<AudioUploadProps> = ({ onFileUpload }) => {
         </div>
       </div>
 
-      {/* Mobile Tab Content */}
-      
       {error && (
         <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start">
           <AlertCircle className="w-5 h-5 text-red-600 mr-3 mt-0.5 flex-shrink-0" />
