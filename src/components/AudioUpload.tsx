@@ -91,11 +91,11 @@ const AudioUpload: React.FC<AudioUploadProps> = ({ onFileUpload }) => {
             >
               <FileAudio className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">
+              <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-2">
                 Upload Meeting Audio
               </h2>
               
-              <p className="text-sm text-gray-600 mb-6">
+              <p className="text-sm sm:text-base text-gray-600 mb-6 sm:mb-8">
                 Drag and drop your audio file here, or click to browse
               </p>
               
