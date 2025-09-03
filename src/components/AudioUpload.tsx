@@ -79,7 +79,7 @@ const AudioUpload: React.FC<AudioUploadProps> = ({ onFileUpload }) => {
           <div className="max-w-md w-full mx-auto">
             <div
               className={`
-                border-2 border-dashed rounded-xl p-6 sm:p-8 text-center transition-all duration-200
+                border-2 border-dashed rounded-xl p-6 sm:p-8 text-center min-h-[400px] flex flex-col justify-center transition-all duration-200
                 ${isDragOver 
                   ? 'border-green-400 bg-green-50' 
                   : 'border-gray-300 hover:border-green-400 hover:bg-green-50'
