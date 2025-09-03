@@ -100,9 +100,9 @@ const AudioUpload: React.FC<AudioUploadProps> = ({ onFileUpload }) => {
               </p>
               
               <div className="space-y-4">
-                <label className="inline-flex items-center justify-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg cursor-pointer transition-colors text-sm w-48">
+                <label className="inline-flex items-center justify-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg cursor-pointer transition-colors text-sm w-48">
                   <Upload className="w-4 h-4 mr-2" />
-                  Choose Audio File
+                  Start Recording
                   <input
                     type="file"
                     className="hidden"
