@@ -137,7 +137,7 @@ export const transcribeAudio = async (file: File, apiKey: string): Promise<Trans
     // Handle different types of network errors
     if (error instanceof TypeError) {
       if (error.message.includes('fetch') || error.message.includes('network')) {
-        throw new APIError('Network error: Unable to connect to OpenAI API. Please check your internet connection and try again.', undefined, 'openai');
+        throw new APIError('Network error: Unable to connect to OpenAI API. This is likely due to CORS restrictions when running in a browser environment. The OpenAI API cannot be called directly from a browser due to security restrictions.', undefined, 'openai');
       }
     }
     
@@ -465,7 +465,7 @@ ${transcriptText}`;
     // Handle different types of network errors
     if (error instanceof TypeError) {
       if (error.message.includes('fetch') || error.message.includes('network')) {
-        throw new APIError('Network error: Unable to connect to OpenAI API. Please check your internet connection and try again.', undefined, 'openai');
+        throw new APIError('Network error: Unable to connect to OpenAI API. This is likely due to CORS restrictions when running in a browser environment. The OpenAI API cannot be called directly from a browser due to security restrictions.', undefined, 'openai');
       }
     }
     
