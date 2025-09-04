@@ -28,12 +28,23 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
         // Load all transcription records
         const records = TranscriptionStorage.getTranscriptions();
         console.log('Loading action items from', records.length, 'records');
+        console.log('Raw records:', records);
         
         const allActionItems: ActionItemWithSource[] = [];
 
         records.forEach((record, recordIndex) => {
+          console.log(`Processing record ${recordIndex}:`, {
+            id: record.id,
+            title: record.title,
+            hasSummary: !!record.summary,
+            hasActionItems: !!(record.summary?.actionItems),
+            actionItemsLength: record.summary?.actionItems?.length || 0,
+            actionItems: record.summary?.actionItems
+          });
+          
           if (record.summary && record.summary.actionItems && Array.isArray(record.summary.actionItems)) {
             record.summary.actionItems.forEach((item, itemIndex) => {
+              console.log(`Processing action item ${itemIndex}:`, item);
               const actionItemWithSource: ActionItemWithSource = {
                 task: item.task || 'No task description',
                 assignee: item.assignee || 'Unassigned',
@@ -46,8 +57,17 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
               
               allActionItems.push(actionItemWithSource);
             });
+          } else {
+            console.log(`Record ${recordIndex} has no valid action items:`, {
+              hasSummary: !!record.summary,
+              summaryKeys: record.summary ? Object.keys(record.summary) : [],
+              actionItems: record.summary?.actionItems
+            });
           }
         });
+
+        console.log('Total action items found:', allActionItems.length);
+        console.log('All action items:', allActionItems);
 
         // Group action items by date
         const groupedByDate = allActionItems.reduce((groups, item) => {
@@ -59,19 +79,22 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
           return groups;
         }, {} as Record<string, ActionItemWithSource[]>);
 
+        console.log('Grouped by date:', groupedByDate);
+
         // Convert to array and sort by date (most recent first)
         const groupedArray: GroupedActionItems[] = Object.entries(groupedByDate)
           .map(([date, items]) => ({ date, items }))
           .sort((a, b) => {
-          const dateA = new Date(a.date);
-          const dateB = new Date(b.date);
-          return dateB.getTime() - dateA.getTime();
-        });
+            const dateA = new Date(a.date);
+            const dateB = new Date(b.date);
+            return dateB.getTime() - dateA.getTime();
+          });
         
         console.log('Grouped action items:', groupedArray);
         setGroupedActionItems(groupedArray);
       } catch (error) {
         console.error('Error loading action items:', error);
+        setGroupedActionItems([]);
       } finally {
         setLoading(false);
       }
@@ -153,13 +176,13 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {groupedActionItems.map((group, groupIndex) => {
-                      let itemCounter = 1;
-                      if (groupIndex > 0) {
-                        itemCounter = groupedActionItems.slice(0, groupIndex).reduce((sum, g) => sum + g.items.length, 1);
-                      }
+                      // Calculate starting counter for this group
+                      const startingCounter = groupedActionItems
+                        .slice(0, groupIndex)
+                        .reduce((sum, g) => sum + g.items.length, 0) + 1;
                       
                       return group.items.map((item, itemIndex) => {
-                        const currentItemNumber = itemCounter + itemIndex;
+                        const currentItemNumber = startingCounter + itemIndex;
                         const isFirstItemOfDate = itemIndex === 0;
                         
                         return (
@@ -175,9 +198,11 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
                                     month: 'short',
                                     day: 'numeric'
                                   })}
+                                  <span className="ml-2 text-xs text-gray-500">
+                                    ({group.items.length} item{group.items.length !== 1 ? 's' : ''})
+                                  </span>
                                 </div>
                               )}
-                              {!isFirstItemOfDate && <div className="h-5"></div>}
                             </td>
                             <td className="px-4 py-4 text-sm text-gray-900">
                               <div className="font-medium text-gray-800 mb-1">{item.sourceMeeting}</div>
