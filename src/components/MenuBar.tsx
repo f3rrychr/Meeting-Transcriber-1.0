@@ -17,8 +17,42 @@ interface MenuBarProps {
 
 const MenuBar: React.FC<MenuBarProps> = ({ onOpenSettings, onShowAbout, onShowExportPrefs, onShowUserGuide, onShowTranscriptionHistory, onShowActionTracker, onReset, hasContent, onOpenFile, onExportTranscript, onExportSummary }) => {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  const [hoverTimeout, setHoverTimeout] = useState<NodeJS.Timeout | null>(null);
+
+  const handleMenuEnter = (menuLabel: string) => {
+    if (hoverTimeout) {
+      clearTimeout(hoverTimeout);
+      setHoverTimeout(null);
+    }
+    setActiveMenu(menuLabel);
+  };
+
+  const handleMenuLeave = () => {
+    const timeout = setTimeout(() => {
+      setActiveMenu(null);
+    }, 150); // Small delay to allow moving to submenu
+    setHoverTimeout(timeout);
+  };
+
+  const handleSubmenuEnter = () => {
+    if (hoverTimeout) {
+      clearTimeout(hoverTimeout);
+      setHoverTimeout(null);
+    }
+  };
+
+  const handleSubmenuLeave = () => {
+    const timeout = setTimeout(() => {
+      setActiveMenu(null);
+    }, 100);
+    setHoverTimeout(timeout);
+  };
 
   const handleMenuItemClick = (action: () => void) => {
+    if (hoverTimeout) {
+      clearTimeout(hoverTimeout);
+      setHoverTimeout(null);
+    }
     setActiveMenu(null); // Close menu first
     action(); // Then execute action
   };
@@ -64,8 +98,8 @@ const MenuBar: React.FC<MenuBarProps> = ({ onOpenSettings, onShowAbout, onShowEx
           <div key={menu.label} className="relative">
             <button
               className="px-3 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
-              onMouseEnter={() => setActiveMenu(menu.label)}
-              onMouseLeave={() => setActiveMenu(null)}
+              onMouseEnter={() => handleMenuEnter(menu.label)}
+              onMouseLeave={handleMenuLeave}
             >
               {menu.label}
             </button>
@@ -73,8 +107,8 @@ const MenuBar: React.FC<MenuBarProps> = ({ onOpenSettings, onShowAbout, onShowEx
             {activeMenu === menu.label && (
               <div 
                 className="absolute top-full left-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10"
-                onMouseEnter={() => setActiveMenu(menu.label)}
-                onMouseLeave={() => setActiveMenu(null)}
+                onMouseEnter={handleSubmenuEnter}
+                onMouseLeave={handleSubmenuLeave}
               >
                 {menu.items.map((item, index) => (
                   item.type === 'separator' ? (
