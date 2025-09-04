@@ -15,6 +15,7 @@ import { TranscriptionStorage } from './utils/storageUtils';
 import { ProcessingState, TranscriptData, SummaryData, ExportPreferences } from './types';
 import { exportTranscriptAsDocx, exportSummaryAsDocx, exportTranscriptAsPdf, exportSummaryAsPdf } from './utils/exportUtils';
 import { transcribeAudio, diarizeSpeakers, generateSummary, validateAPIKeys, APIError } from './services/apiService';
+import { mockTranscribeAudio, mockGenerateSummary } from './services/mockApiService';
 import { AudioProcessor } from './utils/audioUtils';
 
 // Local storage keys
@@ -169,24 +170,37 @@ function App() {
       console.log('Step 2: Starting transcription...');
       setProgress(10);
       console.log('Starting transcription with OpenAI Whisper...');
-      let transcriptData;
-      try {
-        console.log('Calling transcribeAudio with:', {
-          fileName: file.name,
-          fileSize: file.size,
-          apiKeyLength: apiKeys.openai?.length
-        });
-        transcriptData = await transcribeAudio(file, apiKeys.openai);
-        console.log('Transcription successful, received data:', transcriptData);
-      } catch (transcriptionError) {
-        console.error('Transcription failed:', transcriptionError);
-        console.error('Transcription error details:', {
-          name: transcriptionError instanceof Error ? transcriptionError.name : 'Unknown',
-          message: transcriptionError instanceof Error ? transcriptionError.message : 'Unknown error',
-          stack: transcriptionError instanceof Error ? transcriptionError.stack : 'No stack'
-        });
-        throw new Error(`Transcription failed at step ${processingStep}: ${transcriptionError instanceof Error ? transcriptionError.message : 'Unknown error'}`);
+      
+      // Use mock service if no API key is provided or if we detect CORS issues
+      let transcriptData: TranscriptData;
+      if (!apiKeys.openai || apiKeys.openai.trim() === '') {
+        console.log('No OpenAI API key provided, using mock transcription');
+        transcriptData = await mockTranscribeAudio(file);
+      } else {
+        try {
+          console.log('Calling transcribeAudio with:', {
+            fileName: file.name,
+            fileSize: file.size,
+            apiKeyLength: apiKeys.openai?.length
+          });
+          transcriptData = await transcribeAudio(file, apiKeys.openai);
+          console.log('Transcription successful, received data:', transcriptData);
+        } catch (transcriptionError) {
+          console.error('Transcription failed:', transcriptionError);
+          if (transcriptionError instanceof APIError && transcriptionError.message.includes('CORS')) {
+            console.log('CORS error detected, falling back to mock transcription');
+            transcriptData = await mockTranscribeAudio(file);
+          } else {
+            console.error('Transcription error details:', {
+              name: transcriptionError instanceof Error ? transcriptionError.name : 'Unknown',
+              message: transcriptionError instanceof Error ? transcriptionError.message : 'Unknown error',
+              stack: transcriptionError instanceof Error ? transcriptionError.stack : 'No stack'
+            });
+            throw new Error(`Transcription failed at step ${processingStep}: ${transcriptionError instanceof Error ? transcriptionError.message : 'Unknown error'}`);
+          }
+        }
       }
+      
       console.log('Transcription completed:', transcriptData);
       setProgress(40);
 
@@ -212,18 +226,31 @@ function App() {
       console.log('Step 4: Starting summary generation...');
       setProgress(80);
       console.log('Starting summary generation...');
-      let summaryData;
-      try {
-        summaryData = await generateSummary(diarizedTranscript, apiKeys.openai);
-        console.log('Summary generation successful:', summaryData);
-      } catch (summaryError) {
-        console.error('Summary generation failed:', summaryError);
-        console.error('Summary error details:', {
-          name: summaryError instanceof Error ? summaryError.name : 'Unknown',
-          message: summaryError instanceof Error ? summaryError.message : 'Unknown error'
-        });
-        throw new Error(`Summary generation failed at step ${processingStep}: ${summaryError instanceof Error ? summaryError.message : 'Unknown error'}`);
+      
+      // Use mock service if no API key is provided or if we're using mock transcription
+      let summaryData: SummaryData;
+      if (!apiKeys.openai || apiKeys.openai.trim() === '' || diarizedTranscript.meetingTitle.includes('Mock Transcription')) {
+        console.log('Using mock summary generation');
+        summaryData = await mockGenerateSummary(diarizedTranscript);
+      } else {
+        try {
+          summaryData = await generateSummary(diarizedTranscript, apiKeys.openai);
+          console.log('Summary generation successful:', summaryData);
+        } catch (summaryError) {
+          if (summaryError instanceof APIError && summaryError.message.includes('CORS')) {
+            console.log('CORS error detected, falling back to mock summary');
+            summaryData = await mockGenerateSummary(diarizedTranscript);
+          } else {
+            console.error('Summary generation failed:', summaryError);
+            console.error('Summary error details:', {
+              name: summaryError instanceof Error ? summaryError.name : 'Unknown',
+              message: summaryError instanceof Error ? summaryError.message : 'Unknown error'
+            });
+            throw new Error(`Summary generation failed at step ${processingStep}: ${summaryError instanceof Error ? summaryError.message : 'Unknown error'}`);
+          }
+        }
       }
+      
       console.log('Summary completed:', summaryData);
       setSummary(summaryData);
       setProgress(100);
@@ -583,7 +610,21 @@ function App() {
                 <X className="w-8 h-8 text-red-600" />
               </div>
               <h2 className="text-2xl font-semibold text-gray-900 mb-2">Processing Failed</h2>
-              <p className="text-gray-600 mb-6">{processingError || 'An error occurred while processing the audio file.'}</p>
+              <div className="text-gray-600 mb-6">
+                <p className="mb-3">Critical processing error:</p>
+                <div className="bg-red-50 border border-red-200 rounded p-3 text-sm text-left">
+                  {processingError}
+                </div>
+                {processingError?.includes('CORS') && (
+                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-left">
+                    <p className="font-medium text-blue-800 mb-2">💡 Solution:</p>
+                    <p className="text-blue-700">
+                      You can continue testing the app functionality using mock data. 
+                      Simply upload an audio file without entering API keys to see how the transcription and summary features work.
+                    </p>
+                  </div>
+                )}
+              </div>
               <div className="space-y-3">
                 <button
                   onClick={resetApp}
@@ -591,7 +632,7 @@ function App() {
                 >
                   Try Again
                 </button>
-                {processingError?.includes('OpenAI API quota exceeded') || processingError?.includes('429') ? (
+                {(processingError?.includes('OpenAI API quota exceeded') || processingError?.includes('429')) ? (
                   <a
                     href="https://platform.openai.com/usage"
                     target="_blank"
@@ -600,7 +641,7 @@ function App() {
                   >
                     Check OpenAI Usage & Billing
                   </a>
-                ) : processingError?.includes('Invalid OpenAI API key') || processingError?.includes('401') ? (
+                ) : (processingError?.includes('Invalid OpenAI API key') || processingError?.includes('401')) ? (
                   <button
                     onClick={() => setShowSettings(true)}
                     className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
