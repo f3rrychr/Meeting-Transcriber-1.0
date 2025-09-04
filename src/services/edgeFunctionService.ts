@@ -175,8 +175,8 @@ export const generateSummaryViaEdgeFunction = async (transcript: TranscriptData,
 export const checkSupabaseConnection = (): boolean => {
   const hasConnection = !!(SUPABASE_URL && SUPABASE_ANON_KEY && 
     SUPABASE_URL !== 'your_supabase_project_url' && 
-    SUPABASE_ANON_KEY !== 'your_supabase_anon_key' &&
-  )
+    SUPABASE_ANON_KEY !== 'your_supabase_anon_key'
+  );
   // More lenient check - just verify they exist and aren't the placeholder values
   const hasUrl = supabaseUrl && supabaseUrl !== 'your_supabase_project_url';
   const hasKey = supabaseKey && supabaseKey !== 'your_supabase_anon_key';
