@@ -105,7 +105,7 @@ const MenuBar: React.FC<MenuBarProps> = ({ onOpenSettings, onShowAbout, onShowEx
         {hasContent && (
           <button
             onClick={onReset}
-            className="flex items-center space-x-2 px-3 py-1 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded"
+            className="flex items-center space-x-2 px-3 py-1 text-sm text-green-600 hover:text-green-700 hover:bg-gray-100 rounded"
           >
             <RotateCcw className="w-4 h-4" />
             <span>New Session</span>
