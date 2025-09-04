@@ -194,7 +194,13 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         <div className="flex items-center">
                           <FileText className="w-4 h-4 mr-1" />
-                          Meeting & Action Item
+                          Meeting
+                        </div>
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <div className="flex items-center">
+                          <CheckSquare className="w-4 h-4 mr-1" />
+                          Action Item
                         </div>
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -231,7 +237,9 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
                               {currentItemNumber}
                             </td>
                             <td className="px-4 py-4 text-sm text-gray-900">
-                              <div className="font-medium text-gray-800 mb-1 text-xs">{item.sourceMeeting}</div>
+                              <div className="font-medium text-gray-800">{item.sourceMeeting}</div>
+                            </td>
+                            <td className="px-4 py-4 text-sm text-gray-900">
                               <div className="text-gray-700">{item.task}</div>
                             </td>
                             <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
