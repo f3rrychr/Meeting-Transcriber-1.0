@@ -149,14 +149,22 @@ function App() {
         console.log('No valid OpenAI API key provided, using mock transcription');
         transcriptData = await mockTranscribeAudio(file);
       } else {
-        console.log('Valid OpenAI API key found, attempting real transcription via edge function');
-        try {
-          transcriptData = await transcribeAudioViaEdgeFunction(file, apiKeys.openai);
-          console.log('Real transcription successful via edge function');
-        } catch (error) {
-          console.error('Edge function transcription failed:', error);
-          // Re-throw the error to show the user what went wrong
-          throw error;
+        // Check if Supabase is connected before attempting real transcription
+        const hasSupabaseConnection = checkSupabaseConnection();
+        
+        if (!hasSupabaseConnection) {
+          console.log('Supabase not connected, using mock transcription');
+          transcriptData = await mockTranscribeAudio(file);
+        } else {
+          console.log('Valid OpenAI API key found, attempting real transcription via edge function');
+          try {
+            transcriptData = await transcribeAudioViaEdgeFunction(file, apiKeys.openai);
+            console.log('Real transcription successful via edge function');
+          } catch (error) {
+            console.error('Edge function transcription failed:', error);
+            // Re-throw the error to show the user what went wrong
+            throw error;
+          }
         }
       }
       
@@ -180,14 +188,22 @@ function App() {
         console.log('No valid OpenAI API key provided, using mock summary');
         summaryData = await mockGenerateSummary(transcriptData);
       } else {
-        console.log('Valid OpenAI API key found, attempting real summary generation via edge function');
-        try {
-          summaryData = await generateSummaryViaEdgeFunction(transcriptData, apiKeys.openai);
-          console.log('Real summary generation successful via edge function');
-        } catch (error) {
-          console.error('Edge function summary failed:', error);
-          // Re-throw the error to show the user what went wrong
-          throw error;
+        // Check if Supabase is connected before attempting real summary generation
+        const hasSupabaseConnection = checkSupabaseConnection();
+        
+        if (!hasSupabaseConnection) {
+          console.log('Supabase not connected, using mock summary');
+          summaryData = await mockGenerateSummary(transcriptData);
+        } else {
+          console.log('Valid OpenAI API key found, attempting real summary generation via edge function');
+          try {
+            summaryData = await generateSummaryViaEdgeFunction(transcriptData, apiKeys.openai);
+            console.log('Real summary generation successful via edge function');
+          } catch (error) {
+            console.error('Edge function summary failed:', error);
+            // Re-throw the error to show the user what went wrong
+            throw error;
+          }
         }
       }
       
