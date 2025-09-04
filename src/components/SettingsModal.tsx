@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Key, Save, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { ApiKeys } from '../types';
 import { validateAPIKeys } from '../services/apiService';
+import ConnectionStatus from './ConnectionStatus';
 
 interface SettingsModalProps {
   apiKeys: ApiKeys;
@@ -78,6 +79,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ apiKeys, onSave, onClose 
         </div>
         
         <div className="p-6 space-y-4">
+          {/* Supabase Connection Status */}
+          <ConnectionStatus />
+
           {/* OpenAI API Key */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
