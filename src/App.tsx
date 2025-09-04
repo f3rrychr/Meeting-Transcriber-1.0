@@ -139,12 +139,11 @@ function App() {
       
       // Determine which service to use based on API key and Supabase availability
       const hasValidApiKey = apiKeys.openai && apiKeys.openai.trim() !== '' && apiKeys.openai.startsWith('sk-');
-      const hasSupabase = checkSupabaseConnection();
       
       if (!hasValidApiKey) {
         console.log('No valid OpenAI API key provided, using mock transcription');
         transcriptData = await mockTranscribeAudio(file);
-      } else if (hasSupabase) {
+      } else {
         console.log('Using Supabase Edge Function for real transcription');
         try {
           transcriptData = await transcribeAudioViaEdgeFunction(file, apiKeys.openai);
@@ -152,9 +151,6 @@ function App() {
           console.warn('Edge function transcription failed, falling back to mock:', error);
           transcriptData = await mockTranscribeAudio(file);
         }
-      } else {
-        console.log('No Supabase connection, using mock transcription');
-        transcriptData = await mockTranscribeAudio(file);
       }
       
       console.log('Transcription completed:', transcriptData);
@@ -176,7 +172,7 @@ function App() {
       if (!hasValidApiKey) {
         console.log('No valid OpenAI API key provided, using mock summary');
         summaryData = await mockGenerateSummary(transcriptData);
-      } else if (hasSupabase) {
+      } else {
         console.log('Using Supabase Edge Function for real summary generation');
         try {
           summaryData = await generateSummaryViaEdgeFunction(transcriptData, apiKeys.openai);
@@ -184,9 +180,6 @@ function App() {
           console.warn('Edge function summary failed, falling back to mock:', error);
           summaryData = await mockGenerateSummary(transcriptData);
         }
-      } else {
-        console.log('No Supabase connection, using mock summary');
-        summaryData = await mockGenerateSummary(transcriptData);
       }
       
       setSummary(summaryData);
