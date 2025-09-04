@@ -15,7 +15,6 @@ import { TranscriptionStorage } from './utils/storageUtils';
 import { ProcessingState, TranscriptData, SummaryData, ExportPreferences } from './types';
 import { exportTranscriptAsDocx, exportSummaryAsDocx, exportTranscriptAsPdf, exportSummaryAsPdf } from './utils/exportUtils';
 import { transcribeAudio, diarizeSpeakers, generateSummary, validateAPIKeys, APIError } from './services/apiService';
-import { mockTranscribeAudio, mockGenerateSummary } from './services/mockApiService';
 import { transcribeAudioViaEdgeFunction, generateSummaryViaEdgeFunction, EdgeFunctionError, checkSupabaseConnection } from './services/edgeFunctionService';
 import { AudioProcessor } from './utils/audioUtils';
 
@@ -140,32 +139,25 @@ function App() {
       // Determine which service to use based on API key and Supabase availability
       const hasValidApiKey = apiKeys.openai && apiKeys.openai.trim() !== '' && apiKeys.openai.startsWith('sk-');
       
-      console.log('Processing decision:', {
-        hasValidApiKey,
-        apiKeyPrefix: hasValidApiKey ? apiKeys.openai.substring(0, 7) + '...' : 'none'
-      });
-      
       if (!hasValidApiKey) {
-        console.log('No valid OpenAI API key provided, using mock transcription');
-        transcriptData = await mockTranscribeAudio(file);
-      } else {
-        // Check if Supabase is connected before attempting real transcription
-        const hasSupabaseConnection = checkSupabaseConnection();
-        
-        if (!hasSupabaseConnection) {
-          console.log('Supabase not connected, using mock transcription');
-          transcriptData = await mockTranscribeAudio(file);
-        } else {
-          console.log('Valid OpenAI API key found, attempting real transcription via edge function');
-          try {
-            transcriptData = await transcribeAudioViaEdgeFunction(file, apiKeys.openai);
-            console.log('Real transcription successful via edge function');
-          } catch (error) {
-            console.error('Edge function transcription failed:', error);
-            // Re-throw the error to show the user what went wrong
-            throw error;
-          }
-        }
+        throw new EdgeFunctionError('OpenAI API key is required. Please add your API key in Settings.');
+      }
+
+      // Check if Supabase is connected before attempting transcription
+      const hasSupabaseConnection = checkSupabaseConnection();
+      
+      if (!hasSupabaseConnection) {
+        throw new EdgeFunctionError('Supabase connection is required. Please click "Connect to Supabase" in the top right corner to set up your Supabase project.');
+      }
+
+      console.log('Valid OpenAI API key found, attempting transcription via edge function');
+      try {
+        transcriptData = await transcribeAudioViaEdgeFunction(file, apiKeys.openai);
+        console.log('Transcription successful via edge function');
+      } catch (error) {
+        console.error('Edge function transcription failed:', error);
+        // Re-throw the error to show the user what went wrong
+        throw error;
       }
       
       console.log('Transcription completed:', transcriptData);
@@ -185,26 +177,24 @@ function App() {
       let summaryData: SummaryData;
       
       if (!hasValidApiKey) {
-        console.log('No valid OpenAI API key provided, using mock summary');
-        summaryData = await mockGenerateSummary(transcriptData);
-      } else {
-        // Check if Supabase is connected before attempting real summary generation
-        const hasSupabaseConnection = checkSupabaseConnection();
-        
-        if (!hasSupabaseConnection) {
-          console.log('Supabase not connected, using mock summary');
-          summaryData = await mockGenerateSummary(transcriptData);
-        } else {
-          console.log('Valid OpenAI API key found, attempting real summary generation via edge function');
-          try {
-            summaryData = await generateSummaryViaEdgeFunction(transcriptData, apiKeys.openai);
-            console.log('Real summary generation successful via edge function');
-          } catch (error) {
-            console.error('Edge function summary failed:', error);
-            // Re-throw the error to show the user what went wrong
-            throw error;
-          }
-        }
+        throw new EdgeFunctionError('OpenAI API key is required for summary generation. Please add your API key in Settings.');
+      }
+
+      // Check if Supabase is connected before attempting summary generation
+      const hasSupabaseConnection = checkSupabaseConnection();
+      
+      if (!hasSupabaseConnection) {
+        throw new EdgeFunctionError('Supabase connection is required for summary generation. Please click "Connect to Supabase" in the top right corner.');
+      }
+
+      console.log('Valid OpenAI API key found, attempting summary generation via edge function');
+      try {
+        summaryData = await generateSummaryViaEdgeFunction(transcriptData, apiKeys.openai);
+        console.log('Summary generation successful via edge function');
+      } catch (error) {
+        console.error('Edge function summary failed:', error);
+        // Re-throw the error to show the user what went wrong
+        throw error;
       }
       
       setSummary(summaryData);
@@ -229,112 +219,13 @@ function App() {
       if (error instanceof APIError || error instanceof EdgeFunctionError) {
         setProcessingError(`API Error: ${error.message}`);
         
-        // If it's an API key error, open settings
-        if (error.statusCode === 401 || error.message.includes('Invalid OpenAI API key')) {
+        // If it's an API key error or missing connection, open settings
+        if (error.statusCode === 401 || error.message.includes('API key') || error.message.includes('Supabase connection')) {
           setShowSettings(true);
         }
       } else {
         setProcessingError(`Processing failed at ${processingStep}: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
-    }
-  };
-
-  // Keep the old mock functions as fallback (can be removed later)
-  const simulateTranscription = async (file: File): Promise<TranscriptData> => {
-    // Mock transcription data with speaker diarization
-    return {
-      speakers: [
-        { id: 'Speaker_1', segments: [
-          { text: "Good morning everyone, thank you for joining today's client meeting.", timestamp: '00:00:15', duration: 3.2 },
-          { text: "Let's start by reviewing the project requirements we discussed last week.", timestamp: '00:01:30', duration: 4.1 }
-        ]},
-        { id: 'Speaker_2', segments: [
-          { text: "Thanks for having us. We're excited to move forward with this initiative.", timestamp: '00:00:45', duration: 3.8 },
-          { text: "Before we dive in, I'd like to clarify a few points about the timeline.", timestamp: '00:02:15', duration: 4.5 }
-        ]}
-      ],
-      meetingDate: new Date(file.lastModified).toLocaleDateString(),
-      meetingTitle: file.name.replace(/\.[^/.]+$/, ""),
-      duration: '00:45:30',
-      wordCount: 2847
-    };
-  };
-
-  const simulateSummarization = async (): Promise<SummaryData> => {
-    return {
-      keyPoints: [
-        "Project timeline confirmed for Q2 2024 delivery",
-        "Budget approved at $125,000 with 10% contingency",
-        "Team structure finalized with 5 developers and 2 designers",
-        "Weekly check-ins scheduled for Thursdays at 2 PM"
-      ],
-      actionItems: [
-        { task: "Finalize technical specifications document", assignee: "Development Team", dueDate: "2024-02-15", remarks: "Include API documentation" },
-        { task: "Set up project management tools and access", assignee: "Project Manager", dueDate: "2024-02-10", remarks: "Jira and Confluence setup" },
-        { task: "Schedule kickoff meeting with full team", assignee: "Client Success", dueDate: "2024-02-12", remarks: "Send calendar invites" }
-      ],
-      nextMeetingPlan: {
-        meetingName: "Technical Architecture Review",
-        scheduledDate: "2024-02-20",
-        scheduledTime: "2:00 PM EST",
-        agenda: "Review technical specifications and finalize development approach"
-      },
-      risks: [
-        { type: "Risk", category: "Resource", item: "Potential resource conflicts with ongoing projects", remarks: "Monitor team availability closely" },
-        { type: "Issue", category: "Technical", item: "Third-party API integration dependencies", remarks: "Identify backup solutions" },
-        { type: "Risk", category: "Timeline", item: "Aggressive delivery schedule may impact quality", remarks: "Consider phased delivery approach" }
-      ],
-      meetingContext: {
-        meetingName: "Q2 2024 Project Kickoff Meeting",
-        meetingDate: "February 8, 2024",
-        participants: [
-          "Sarah Johnson (Project Manager)",
-          "Mike Chen (Lead Developer)",
-          "Emily Rodriguez (UX Designer)",
-          "David Kim (Client Representative)",
-          "Lisa Thompson (Business Analyst)"
-        ]
-      }
-    };
-  };
-
-  // Legacy processing function (keeping for reference)
-  const processAudioFileMock = async (file: File) => {
-    try {
-      // Step 1: Upload and validate (10%)
-      setProgress(10);
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Step 2: Transcription (60%)
-      setProgress(30);
-      const mockTranscript = await simulateTranscription(file);
-      setTranscript(mockTranscript);
-      setProgress(60);
-
-      // Step 3: Speaker Diarization (80%)
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setProgress(80);
-
-      // Step 4: Summarization (100%)
-      const mockSummary = await simulateSummarization();
-      setSummary(mockSummary);
-      setProgress(100);
-      
-      setProcessingState('completed');
-      
-      // Simulate Windows toast notification
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('Meeting Transcriber', {
-          body: `Transcription completed for ${file.name}`,
-          icon: '/favicon.ico'
-        });
-      } else if ('Notification' in window && Notification.permission === 'default') {
-        // Request notification permission for future use
-        Notification.requestPermission();
-      }
-    } catch (error) {
-      console.error('Processing error:', error);
-      setProcessingState('error');
     }
   };
 
