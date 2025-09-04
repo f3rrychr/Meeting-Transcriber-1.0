@@ -13,52 +13,27 @@ interface ActionItemWithSource extends ActionItem {
   sourceDate: string;
 }
 
-interface MeetingRecord {
-  sourceId: string;
-  meetingTitle: string;
-  meetingDate: string;
-  actionItem?: ActionItemWithSource;
+interface GroupedActionItems {
+  date: string;
+  items: ActionItemWithSource[];
 }
 
 const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
-  const [meetingRecords, setMeetingRecords] = useState<MeetingRecord[]>([]);
+  const [groupedActionItems, setGroupedActionItems] = useState<GroupedActionItems[]>([]);
   const [loading, setLoading] = useState(true);
-  const [debugInfo, setDebugInfo] = useState<string>('');
 
   useEffect(() => {
-    const loadMeetingRecords = () => {
+    const loadActionItems = () => {
       try {
-        console.log('=== Action Tracker Debug ===');
-        
         // Load all transcription records
         const records = TranscriptionStorage.getTranscriptions();
-        console.log('Raw records from storage:', records);
-        console.log('Number of records found:', records.length);
+        console.log('Loading action items from', records.length, 'records');
         
-        let debugText = `Found ${records.length} transcription records\n`;
-        
-        const allMeetingRecords: MeetingRecord[] = [];
+        const allActionItems: ActionItemWithSource[] = [];
 
         records.forEach((record, recordIndex) => {
-          console.log(`Processing record ${recordIndex + 1}:`, {
-            id: record.id,
-            title: record.title,
-            date: record.date,
-            hasSummary: !!record.summary,
-            hasActionItems: !!(record.summary?.actionItems),
-            actionItemsCount: record.summary?.actionItems?.length || 0
-          });
-          
-          debugText += `\nRecord ${recordIndex + 1}: ${record.title}\n`;
-          debugText += `  Date: ${record.date}\n`;
-          debugText += `  Has Summary: ${!!record.summary}\n`;
-          
           if (record.summary && record.summary.actionItems && Array.isArray(record.summary.actionItems)) {
-            debugText += `  Action Items: ${record.summary.actionItems.length}\n`;
-            
             record.summary.actionItems.forEach((item, itemIndex) => {
-              console.log(`  Action item ${itemIndex + 1}:`, item);
-              
               const actionItemWithSource: ActionItemWithSource = {
                 task: item.task || 'No task description',
                 assignee: item.assignee || 'Unassigned',
@@ -69,51 +44,40 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
                 sourceDate: record.date || 'Unknown Date'
               };
               
-              const meetingRecord: MeetingRecord = {
-                sourceId: record.id,
-                meetingTitle: record.title || 'Untitled Meeting',
-                meetingDate: record.date || 'Unknown Date',
-                actionItem: actionItemWithSource
-              };
-              
-              allMeetingRecords.push(meetingRecord);
-              debugText += `    ${itemIndex + 1}. ${item.task} (${item.assignee})\n`;
+              allActionItems.push(actionItemWithSource);
             });
-          } else {
-            // Add meeting record even without action items
-            debugText += `  Action Items: 0 (no action items, but adding meeting record)\n`;
-            const meetingRecord: MeetingRecord = {
-              sourceId: record.id,
-              meetingTitle: record.title || 'Untitled Meeting',
-              meetingDate: record.date || 'Unknown Date'
-            };
-            allMeetingRecords.push(meetingRecord);
           }
         });
 
-        console.log('Total meeting records extracted:', allMeetingRecords.length);
-        console.log('All meeting records:', allMeetingRecords);
-        
-        debugText += `\nTotal meeting records found: ${allMeetingRecords.length}`;
-        setDebugInfo(debugText);
+        // Group action items by date
+        const groupedByDate = allActionItems.reduce((groups, item) => {
+          const date = item.sourceDate;
+          if (!groups[date]) {
+            groups[date] = [];
+          }
+          groups[date].push(item);
+          return groups;
+        }, {} as Record<string, ActionItemWithSource[]>);
 
-        // Sort by meeting date (most recent first)
-        allMeetingRecords.sort((a, b) => {
-          const dateA = new Date(a.meetingDate);
-          const dateB = new Date(b.meetingDate);
+        // Convert to array and sort by date (most recent first)
+        const groupedArray: GroupedActionItems[] = Object.entries(groupedByDate)
+          .map(([date, items]) => ({ date, items }))
+          .sort((a, b) => {
+          const dateA = new Date(a.date);
+          const dateB = new Date(b.date);
           return dateB.getTime() - dateA.getTime();
         });
         
-        setMeetingRecords(allMeetingRecords);
+        console.log('Grouped action items:', groupedArray);
+        setGroupedActionItems(groupedArray);
       } catch (error) {
         console.error('Error loading action items:', error);
-        setDebugInfo(`Error loading data: ${error instanceof Error ? error.message : 'Unknown error'}`);
       } finally {
         setLoading(false);
       }
     };
 
-    loadMeetingRecords();
+    loadActionItems();
   }, []);
 
   if (loading) {
@@ -146,91 +110,107 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
         </div>
         
         <div className="p-6">
-          {meetingRecords.length > 0 ? (
-            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
-                        <div className="flex items-center">
-                          <Hash className="w-4 h-4 mr-1" />
-                          No
-                        </div>
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        <div className="flex items-center">
-                          <FileText className="w-4 h-4 mr-1" />
-                          Meeting Title
-                        </div>
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Action Item
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        <div className="flex items-center">
-                          <User className="w-4 h-4 mr-1" />
-                          PIC
-                        </div>
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        <div className="flex items-center">
-                          <Calendar className="w-4 h-4 mr-1" />
-                          Due Date
-                        </div>
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Remarks
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {meetingRecords.map((record, index) => (
-                      <tr key={`${record.sourceId}-${index}`} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {index + 1}
-                        </td>
-                        <td className="px-4 py-4 text-sm text-gray-900">
-                          <div className="font-medium">{record.meetingTitle}</div>
-                          <div className="text-xs text-gray-500 mt-1">{record.meetingDate}</div>
-                        </td>
-                        <td className="px-4 py-4 text-sm text-gray-900">
-                          {record.actionItem ? (
-                            <div className="max-w-md">{record.actionItem.task}</div>
-                          ) : (
-                            <span className="text-gray-400 italic">No action items</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                          {record.actionItem ? record.actionItem.assignee : '-'}
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                          {record.actionItem ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                              {record.actionItem.dueDate}
-                            </span>
-                          ) : (
-                            '-'
-                          )}
-                        </td>
-                        <td className="px-4 py-4 text-sm text-gray-700">
-                          {record.actionItem?.remarks || '-'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+          {groupedActionItems.length > 0 ? (
+            <div className="space-y-6">
+              {groupedActionItems.map((group, groupIndex) => {
+                let itemCounter = groupIndex === 0 ? 1 : groupedActionItems.slice(0, groupIndex).reduce((sum, g) => sum + g.items.length, 1);
+                
+                return (
+                  <div key={group.date} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                    {/* Date Header */}
+                    <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                      <h3 className="text-sm font-semibold text-gray-900 flex items-center">
+                        <Calendar className="w-4 h-4 mr-2 text-blue-600" />
+                        {new Date(group.date).toLocaleDateString('en-US', {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        })}
+                        <span className="ml-2 text-xs text-gray-500">
+                          ({group.items.length} action item{group.items.length !== 1 ? 's' : ''})
+                        </span>
+                      </h3>
+                    </div>
+                    
+                    {/* Action Items Table */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-gray-25 border-b border-gray-100">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
+                              <div className="flex items-center">
+                                <Hash className="w-4 h-4 mr-1" />
+                                No
+                              </div>
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              <div className="flex items-center">
+                                <FileText className="w-4 h-4 mr-1" />
+                                Meeting & Action Item
+                              </div>
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              <div className="flex items-center">
+                                <User className="w-4 h-4 mr-1" />
+                                PIC
+                              </div>
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              <div className="flex items-center">
+                                <Calendar className="w-4 h-4 mr-1" />
+                                Due Date
+                              </div>
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Remarks
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-100">
+                          {group.items.map((item, itemIndex) => {
+                            const currentItemNumber = itemCounter + itemIndex;
+                            return (
+                              <tr key={`${item.sourceId}-${itemIndex}`} className="hover:bg-gray-50 transition-colors">
+                                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                  {currentItemNumber}
+                                </td>
+                                <td className="px-4 py-4 text-sm text-gray-900">
+                                  <div className="font-medium text-gray-800 mb-1">{item.sourceMeeting}</div>
+                                  <div className="text-gray-700">{item.task}</div>
+                                </td>
+                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    {item.assignee}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    {item.dueDate}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-4 text-sm text-gray-700">
+                                  {item.remarks || '-'}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-12">
               <CheckSquare className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Meeting Records Found</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No Action Items Found</h3>
               <p className="text-gray-500">
-                Meeting records from your transcription sessions will appear here.
+                Action items from your transcription sessions will appear here.
               </p>
               <p className="text-sm text-gray-400 mt-2">
-                Process some meeting audio files to see meeting records here.
+                Process some meeting audio files to see action items here.
               </p>
             </div>
           )}
@@ -238,7 +218,10 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
         
         <div className="flex justify-between items-center p-6 border-t border-gray-200 bg-gray-50">
           <div className="text-sm text-gray-600">
-            {meetingRecords.length > 0 ? `Showing ${meetingRecords.length} records from previous meetings` : 'No meeting records to display'}
+            {groupedActionItems.length > 0 ? 
+              `Showing ${groupedActionItems.reduce((sum, group) => sum + group.items.length, 0)} action items from ${groupedActionItems.length} meeting date${groupedActionItems.length !== 1 ? 's' : ''}` : 
+              'No action items to display'
+            }
           </div>
           <button
             onClick={onClose}
