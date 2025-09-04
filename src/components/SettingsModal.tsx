@@ -3,7 +3,6 @@ import { X, Key, Save, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { ApiKeys } from '../types';
 import { validateAPIKeys } from '../services/apiService';
 import ConnectionStatus from './ConnectionStatus';
-import ConnectionStatus from './ConnectionStatus';
 
 interface SettingsModalProps {
   apiKeys: ApiKeys;
