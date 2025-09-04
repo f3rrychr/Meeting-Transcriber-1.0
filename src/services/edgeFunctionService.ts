@@ -1,9 +1,8 @@
 // Edge Function Service for real API calls through Supabase
 import { TranscriptData, SummaryData } from '../types';
 
-// Get Supabase URL from environment or use default local development URL
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'http://localhost:54321';
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'mock-anon-key';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export class EdgeFunctionError extends Error {
   constructor(message: string, public statusCode?: number) {
@@ -15,6 +14,10 @@ export class EdgeFunctionError extends Error {
 export const transcribeAudioViaEdgeFunction = async (file: File, apiKey: string): Promise<TranscriptData> => {
   console.log('transcribeAudioViaEdgeFunction called with file:', file.name, 'size:', file.size);
   
+  if (!SUPABASE_URL) {
+    throw new EdgeFunctionError('Supabase URL not configured. Please set up Supabase connection.');
+  }
+
   if (!apiKey || !apiKey.startsWith('sk-')) {
     throw new EdgeFunctionError('Invalid OpenAI API key. Key should start with "sk-"');
   }
@@ -84,6 +87,10 @@ export const transcribeAudioViaEdgeFunction = async (file: File, apiKey: string)
 export const generateSummaryViaEdgeFunction = async (transcript: TranscriptData, apiKey: string): Promise<SummaryData> => {
   console.log('generateSummaryViaEdgeFunction called');
   
+  if (!SUPABASE_URL) {
+    throw new EdgeFunctionError('Supabase URL not configured. Please set up Supabase connection.');
+  }
+
   if (!apiKey || !apiKey.startsWith('sk-')) {
     throw new EdgeFunctionError('Invalid OpenAI API key for summary generation');
   }
@@ -145,6 +152,5 @@ export const generateSummaryViaEdgeFunction = async (transcript: TranscriptData,
 };
 
 export const checkSupabaseConnection = (): boolean => {
-  // Always return true since we have fallback URLs
-  return true;
+  return !!(SUPABASE_URL && SUPABASE_ANON_KEY);
 };
