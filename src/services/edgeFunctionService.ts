@@ -30,27 +30,15 @@ export const transcribeAudioViaEdgeFunction = async (file: File, apiKey: string)
   // Check file size (25MB limit for OpenAI)
   const maxSize = 25 * 1024 * 1024;
   
-  let processedFile = file;
-  
-  // Compress audio if it exceeds the size limit
   if (AudioProcessor.needsCompression(file)) {
-    try {
-      console.log('File exceeds 25MB limit, compressing audio...');
-      processedFile = await AudioProcessor.compressAudio(file);
-      console.log('Audio compressed from', Math.round(file.size / 1024 / 1024), 'MB to', Math.round(processedFile.size / 1024 / 1024), 'MB');
-    } catch (compressionError) {
-      console.error('Audio compression failed:', compressionError);
-      throw new EdgeFunctionError(`Failed to compress audio file: ${compressionError instanceof Error ? compressionError.message : 'Unknown compression error'}`);
-    }
+    const fileSizeMB = Math.round(file.size / 1024 / 1024);
+    throw new EdgeFunctionError(
+      `File too large (${fileSizeMB}MB). OpenAI Whisper API has a 25MB limit. Please compress your audio file using external software (like Audacity, FFmpeg, or online converters) before uploading.`
+    );
   }
   
-  // Final size check after compression
-  if (processedFile.size > maxSize) {
-    throw new EdgeFunctionError(`File still too large after compression (${Math.round(processedFile.size / 1024 / 1024)}MB). Maximum size is 25MB.`);
-  }
-
   const formData = new FormData();
-  formData.append('file', processedFile);
+  formData.append('file', file);
   formData.append('apiKey', apiKey);
 
   const apiUrl = `${SUPABASE_URL}/functions/v1/transcribe-audio`;
