@@ -147,7 +147,9 @@ function App() {
       const hasSupabaseConnection = checkSupabaseConnection();
       
       if (!hasSupabaseConnection) {
-        throw new EdgeFunctionError('Supabase connection is required. Please click "Connect to Supabase" in the top right corner to set up your Supabase project.');
+        setProcessingState('error');
+        setProcessingError('Supabase connection is required. Please click "Connect to Supabase" in the top right corner to set up your Supabase project.');
+        return;
       }
 
       console.log('Valid OpenAI API key found, attempting transcription via edge function');
@@ -182,7 +184,9 @@ function App() {
 
       // Check if Supabase is connected before attempting summary generation
       if (!hasSupabaseConnection) {
-        throw new EdgeFunctionError('Supabase connection is required for summary generation. Please click "Connect to Supabase" in the top right corner.');
+        setProcessingState('error');
+        setProcessingError('Supabase connection is required for summary generation. Please click "Connect to Supabase" in the top right corner.');
+        return;
       }
 
       console.log('Valid OpenAI API key found, attempting summary generation via edge function');
