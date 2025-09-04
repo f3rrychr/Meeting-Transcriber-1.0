@@ -144,7 +144,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ apiKeys, onSave, onClose 
             <h4 className="font-medium text-blue-900 mb-2">Getting API Keys</h4>
             <div className="text-sm text-blue-800 space-y-1">
               <p>• OpenAI: Visit <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="underline">platform.openai.com/api-keys</a></p>
-              <p>• Hugging Face: Visit <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener noreferrer" className="underline">huggingface.co/settings/tokens</a></p>
+            </div>
+          </div>
+
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <h4 className="font-medium text-green-900 mb-2">Supabase Connection Required</h4>
+            <div className="text-sm text-green-800 space-y-1">
+              <p>• Real transcription requires Supabase Edge Functions</p>
+              <p>• Click "Connect to Supabase" in the top right to set up</p>
+              <p>• Without Supabase, the app will use mock data for testing</p>
             </div>
           </div>
 

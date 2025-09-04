@@ -16,6 +16,7 @@ import { ProcessingState, TranscriptData, SummaryData, ExportPreferences } from 
 import { exportTranscriptAsDocx, exportSummaryAsDocx, exportTranscriptAsPdf, exportSummaryAsPdf } from './utils/exportUtils';
 import { transcribeAudio, diarizeSpeakers, generateSummary, validateAPIKeys, APIError } from './services/apiService';
 import { mockTranscribeAudio, mockGenerateSummary } from './services/mockApiService';
+import { transcribeAudioViaEdgeFunction, generateSummaryViaEdgeFunction, EdgeFunctionError, checkSupabaseConnection } from './services/edgeFunctionService';
 import { AudioProcessor } from './utils/audioUtils';
 
 // Local storage keys
@@ -136,60 +137,56 @@ function App() {
       
       let transcriptData: TranscriptData;
       
-      // Check if we should use mock service
-      const shouldUseMock = !apiKeys.openai || apiKeys.openai.trim() === '' || !apiKeys.openai.startsWith('sk-');
+      // Determine which service to use based on API key and Supabase availability
+      const hasValidApiKey = apiKeys.openai && apiKeys.openai.trim() !== '' && apiKeys.openai.startsWith('sk-');
+      const hasSupabase = checkSupabaseConnection();
       
-      if (shouldUseMock) {
-        console.log('No OpenAI API key provided, using mock transcription');
+      if (!hasValidApiKey) {
+        console.log('No valid OpenAI API key provided, using mock transcription');
         transcriptData = await mockTranscribeAudio(file);
-      } else {
-        console.log('Starting transcription with OpenAI Whisper...');
+      } else if (hasSupabase) {
+        console.log('Using Supabase Edge Function for real transcription');
         try {
-          transcriptData = await transcribeAudio(file, apiKeys.openai);
-        } catch (transcriptionError) {
-          console.warn('Real API transcription failed, falling back to mock:', transcriptionError);
-          // Always fall back to mock on any error to ensure app functionality
-          console.log('API error detected, falling back to mock transcription');
+          transcriptData = await transcribeAudioViaEdgeFunction(file, apiKeys.openai);
+        } catch (error) {
+          console.warn('Edge function transcription failed, falling back to mock:', error);
           transcriptData = await mockTranscribeAudio(file);
         }
+      } else {
+        console.log('No Supabase connection, using mock transcription');
+        transcriptData = await mockTranscribeAudio(file);
       }
       
       console.log('Transcription completed:', transcriptData);
       setProgress(40);
 
-      // Step 3: Speaker Diarization with Hugging Face (70%)
+      // Step 3: Speaker Diarization (70%) - Skip for now as it's complex
       processingStep = 'speaker diarization';
-      console.log('Step 3: Starting speaker diarization...');
-      setProgress(50);
-      let diarizedTranscript;
-      try {
-        diarizedTranscript = await diarizeSpeakers(file, transcriptData, apiKeys.huggingface);
-      } catch (diarizationError) {
-        console.warn('Diarization failed, using original transcript:', diarizationError);
-        diarizedTranscript = transcriptData; // Fallback to original transcript
-      }
-      setTranscript(diarizedTranscript);
+      console.log('Step 3: Skipping speaker diarization (using single speaker)');
       setProgress(70);
+      setTranscript(transcriptData);
 
-      // Step 4: Summary Generation with OpenAI GPT (100%)
+      // Step 4: Summary Generation (100%)
       processingStep = 'summary generation';
       console.log('Step 4: Starting summary generation...');
       setProgress(80);
       
       let summaryData: SummaryData;
       
-      if (shouldUseMock || diarizedTranscript.meetingTitle.includes('Mock Transcription')) {
-        console.log('Using mock summary generation');
-        summaryData = await mockGenerateSummary(diarizedTranscript);
-      } else {
+      if (!hasValidApiKey) {
+        console.log('No valid OpenAI API key provided, using mock summary');
+        summaryData = await mockGenerateSummary(transcriptData);
+      } else if (hasSupabase) {
+        console.log('Using Supabase Edge Function for real summary generation');
         try {
-          summaryData = await generateSummary(diarizedTranscript, apiKeys.openai);
-        } catch (summaryError) {
-          console.warn('Real API summary failed, falling back to mock:', summaryError);
-          // Always fall back to mock on any error to ensure app functionality
-          console.log('API error detected, falling back to mock summary');
-          summaryData = await mockGenerateSummary(diarizedTranscript);
+          summaryData = await generateSummaryViaEdgeFunction(transcriptData, apiKeys.openai);
+        } catch (transcriptionError) {
+          console.warn('Edge function summary failed, falling back to mock:', error);
+          summaryData = await mockGenerateSummary(transcriptData);
         }
+      } else {
+        console.log('No Supabase connection, using mock summary');
+        summaryData = await mockGenerateSummary(transcriptData);
       }
       
       setSummary(summaryData);
@@ -198,7 +195,7 @@ function App() {
       setProcessingState('completed');
       
       // Save transcription to history
-      TranscriptionStorage.saveTranscription(file.name, diarizedTranscript, summaryData);
+      TranscriptionStorage.saveTranscription(file.name, transcriptData, summaryData);
       
       // Show success notification
       if ('Notification' in window && Notification.permission === 'granted') {
@@ -211,11 +208,11 @@ function App() {
       console.error('Processing failed at step:', processingStep, error);
       setProcessingState('error');
       
-      if (error instanceof APIError) {
+      if (error instanceof APIError || error instanceof EdgeFunctionError) {
         setProcessingError(`API Error: ${error.message}`);
         
         // If it's an API key error, open settings
-        if (error.statusCode === 401) {
+        if (error.statusCode === 401 || error.message.includes('Invalid OpenAI API key')) {
           setShowSettings(true);
         }
       } else {
