@@ -111,96 +111,98 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
         
         <div className="p-6">
           {groupedActionItems.length > 0 ? (
-            <div className="space-y-6">
-              {groupedActionItems.map((group, groupIndex) => {
-                let itemCounter = groupIndex === 0 ? 1 : groupedActionItems.slice(0, groupIndex).reduce((sum, g) => sum + g.items.length, 1);
-                
-                return (
-                  <div key={group.date} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                    {/* Date Header */}
-                    <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                      <h3 className="text-sm font-semibold text-gray-900 flex items-center">
-                        <Calendar className="w-4 h-4 mr-2 text-blue-600" />
-                        {new Date(group.date).toLocaleDateString('en-US', {
-                          weekday: 'long',
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric'
-                        })}
-                        <span className="ml-2 text-xs text-gray-500">
-                          ({group.items.length} action item{group.items.length !== 1 ? 's' : ''})
-                        </span>
-                      </h3>
-                    </div>
-                    
-                    {/* Action Items Table */}
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead className="bg-gray-25 border-b border-gray-100">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
-                              <div className="flex items-center">
-                                <Hash className="w-4 h-4 mr-1" />
-                                No
-                              </div>
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              <div className="flex items-center">
-                                <FileText className="w-4 h-4 mr-1" />
-                                Meeting & Action Item
-                              </div>
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              <div className="flex items-center">
-                                <User className="w-4 h-4 mr-1" />
-                                PIC
-                              </div>
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              <div className="flex items-center">
-                                <Calendar className="w-4 h-4 mr-1" />
-                                Due Date
-                              </div>
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Remarks
-                            </th>
+            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
+                        <div className="flex items-center">
+                          <Hash className="w-4 h-4 mr-1" />
+                          No
+                        </div>
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <div className="flex items-center">
+                          <Calendar className="w-4 h-4 mr-1" />
+                          Meeting Date
+                        </div>
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <div className="flex items-center">
+                          <FileText className="w-4 h-4 mr-1" />
+                          Meeting & Action Item
+                        </div>
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <div className="flex items-center">
+                          <User className="w-4 h-4 mr-1" />
+                          PIC
+                        </div>
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <div className="flex items-center">
+                          <Calendar className="w-4 h-4 mr-1" />
+                          Due Date
+                        </div>
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Remarks
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {groupedActionItems.map((group, groupIndex) => {
+                      let itemCounter = 1;
+                      if (groupIndex > 0) {
+                        itemCounter = groupedActionItems.slice(0, groupIndex).reduce((sum, g) => sum + g.items.length, 1);
+                      }
+                      
+                      return group.items.map((item, itemIndex) => {
+                        const currentItemNumber = itemCounter + itemIndex;
+                        const isFirstItemOfDate = itemIndex === 0;
+                        
+                        return (
+                          <tr key={`${item.sourceId}-${itemIndex}`} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                              {currentItemNumber}
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                              {isFirstItemOfDate && (
+                                <div className="font-medium text-blue-700 mb-1">
+                                  {new Date(group.date).toLocaleDateString('en-US', {
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric'
+                                  })}
+                                </div>
+                              )}
+                              {!isFirstItemOfDate && <div className="h-5"></div>}
+                            </td>
+                            <td className="px-4 py-4 text-sm text-gray-900">
+                              <div className="font-medium text-gray-800 mb-1">{item.sourceMeeting}</div>
+                              <div className="text-gray-700">{item.task}</div>
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                {item.assignee}
+                              </span>
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {item.dueDate}
+                              </span>
+                            </td>
+                            <td className="px-4 py-4 text-sm text-gray-700">
+                              {item.remarks || '-'}
+                            </td>
                           </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-100">
-                          {group.items.map((item, itemIndex) => {
-                            const currentItemNumber = itemCounter + itemIndex;
-                            return (
-                              <tr key={`${item.sourceId}-${itemIndex}`} className="hover:bg-gray-50 transition-colors">
-                                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                  {currentItemNumber}
-                                </td>
-                                <td className="px-4 py-4 text-sm text-gray-900">
-                                  <div className="font-medium text-gray-800 mb-1">{item.sourceMeeting}</div>
-                                  <div className="text-gray-700">{item.task}</div>
-                                </td>
-                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                    {item.assignee}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                    {item.dueDate}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-4 text-sm text-gray-700">
-                                  {item.remarks || '-'}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                );
-              })}
+                        );
+                      });
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           ) : (
             <div className="text-center py-12">
@@ -219,7 +221,7 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
         <div className="flex justify-between items-center p-6 border-t border-gray-200 bg-gray-50">
           <div className="text-sm text-gray-600">
             {groupedActionItems.length > 0 ? 
-              `Showing ${groupedActionItems.reduce((sum, group) => sum + group.items.length, 0)} action items from ${groupedActionItems.length} meeting date${groupedActionItems.length !== 1 ? 's' : ''}` : 
+              `Showing ${groupedActionItems.reduce((sum, group) => sum + group.items.length, 0)} action items from ${groupedActionItems.length} meeting session${groupedActionItems.length !== 1 ? 's' : ''}` : 
               'No action items to display'
             }
           </div>
