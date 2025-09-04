@@ -58,11 +58,6 @@ export const transcribeAudio = async (file: File, apiKey: string): Promise<Trans
   const timeoutId = setTimeout(() => {
     console.log('Request timeout after 5 minutes');
     controller.abort();
-  }
-  )
-  const timeoutId = setTimeout(() => {
-    console.log('Request timeout after 5 minutes');
-    controller.abort();
   }, 300000); // 5 minute timeout
   
   if (!apiKey || !apiKey.startsWith('sk-')) {
