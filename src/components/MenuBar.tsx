@@ -82,7 +82,7 @@ const MenuBar: React.FC<MenuBarProps> = ({ onOpenSettings, onShowAbout, onShowEx
                   ) : (
                     <button
                       key={index}
-                      className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center justify-between ${
+                      className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center justify-between transition-colors duration-75 ${
                         item.disabled ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700'
                       }`}
                       onClick={() => !item.disabled && item.action()}
