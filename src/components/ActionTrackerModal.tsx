@@ -114,8 +114,8 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
         setDebugInfo(debugLog);
         setGroupedActionItems(groupedArray);
         
-        // If we have transcription records but no action items, show sample data
-        if (records.length > 0 && groupedArray.length === 0) {
+        // Always show sample data when no real action items exist
+        if (groupedArray.length === 0) {
           console.log('ActionTracker: No action items found, showing sample data');
           const sampleActionItems: GroupedActionItems[] = [{
             date: '6/13/2023',
