@@ -15,7 +15,11 @@ export const transcribeAudioViaEdgeFunction = async (file: File, apiKey: string)
   console.log('transcribeAudioViaEdgeFunction called with file:', file.name, 'size:', file.size);
   
   if (!SUPABASE_URL) {
-    throw new EdgeFunctionError('Supabase URL not configured. Please set up Supabase connection.');
+    throw new EdgeFunctionError('Supabase URL not configured. Please click "Connect to Supabase" in the top right to set up your Supabase connection.');
+  }
+
+  if (!SUPABASE_ANON_KEY) {
+    throw new EdgeFunctionError('Supabase anonymous key not configured. Please set up your Supabase connection.');
   }
 
   if (!apiKey || !apiKey.startsWith('sk-')) {
@@ -35,6 +39,13 @@ export const transcribeAudioViaEdgeFunction = async (file: File, apiKey: string)
   const apiUrl = `${SUPABASE_URL}/functions/v1/transcribe-audio`;
   
   console.log('Sending request to edge function:', apiUrl);
+  console.log('Request details:', {
+    method: 'POST',
+    hasFile: !!file,
+    fileName: file.name,
+    fileSize: file.size,
+    hasApiKey: !!apiKey
+  });
 
   try {
     const response = await fetch(apiUrl, {
@@ -46,10 +57,11 @@ export const transcribeAudioViaEdgeFunction = async (file: File, apiKey: string)
     });
 
     console.log('Edge function response status:', response.status);
+    console.log('Edge function response headers:', Object.fromEntries(response.headers.entries()));
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error('Edge function error:', errorData);
+      console.error('Edge function error response:', errorData);
       
       if (response.status === 401) {
         throw new EdgeFunctionError('Invalid OpenAI API key. Please check your API key in Settings.');
@@ -77,7 +89,7 @@ export const transcribeAudioViaEdgeFunction = async (file: File, apiKey: string)
     }
     
     if (error instanceof TypeError && error.message.includes('fetch')) {
-      throw new EdgeFunctionError('Network error: Unable to connect to transcription service. Please check your internet connection.');
+      throw new EdgeFunctionError('Network error: Unable to connect to Supabase edge function. Please check your Supabase connection and try again.');
     }
     
     throw new EdgeFunctionError(`Failed to transcribe audio: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -88,7 +100,11 @@ export const generateSummaryViaEdgeFunction = async (transcript: TranscriptData,
   console.log('generateSummaryViaEdgeFunction called');
   
   if (!SUPABASE_URL) {
-    throw new EdgeFunctionError('Supabase URL not configured. Please set up Supabase connection.');
+    throw new EdgeFunctionError('Supabase URL not configured. Please click "Connect to Supabase" in the top right to set up your Supabase connection.');
+  }
+
+  if (!SUPABASE_ANON_KEY) {
+    throw new EdgeFunctionError('Supabase anonymous key not configured. Please set up your Supabase connection.');
   }
 
   if (!apiKey || !apiKey.startsWith('sk-')) {
@@ -144,7 +160,7 @@ export const generateSummaryViaEdgeFunction = async (transcript: TranscriptData,
     }
     
     if (error instanceof TypeError && error.message.includes('fetch')) {
-      throw new EdgeFunctionError('Network error: Unable to connect to summary service. Please check your internet connection.');
+      throw new EdgeFunctionError('Network error: Unable to connect to Supabase edge function. Please check your Supabase connection and try again.');
     }
     
     throw new EdgeFunctionError(`Failed to generate summary: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -152,5 +168,11 @@ export const generateSummaryViaEdgeFunction = async (transcript: TranscriptData,
 };
 
 export const checkSupabaseConnection = (): boolean => {
-  return !!(SUPABASE_URL && SUPABASE_ANON_KEY);
+  const hasConnection = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
+  console.log('Supabase connection check:', {
+    hasUrl: !!SUPABASE_URL,
+    hasKey: !!SUPABASE_ANON_KEY,
+    connected: hasConnection
+  });
+  return hasConnection;
 };

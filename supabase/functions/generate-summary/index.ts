@@ -1,18 +1,16 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
-}
+};
 
-serve(async (req: Request) => {
+Deno.serve(async (req: Request) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, {
       status: 200,
       headers: corsHeaders,
-    })
+    });
   }
 
   try {
@@ -23,10 +21,16 @@ serve(async (req: Request) => {
           status: 405,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
-      )
+      );
     }
 
-    const { transcript, apiKey } = await req.json()
+    const { transcript, apiKey } = await req.json();
+
+    console.log("Edge function received summary request:", {
+      hasTranscript: !!transcript,
+      hasApiKey: !!apiKey,
+      apiKeyPrefix: apiKey?.substring(0, 3)
+    });
 
     if (!transcript) {
       return new Response(
@@ -35,25 +39,25 @@ serve(async (req: Request) => {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
-      )
+      );
     }
 
     if (!apiKey || !apiKey.startsWith("sk-")) {
       return new Response(
-        JSON.stringify({ error: "Invalid OpenAI API key" }),
+        JSON.stringify({ error: "Invalid OpenAI API key. Key should start with 'sk-'" }),
         {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
-      )
+      );
     }
 
-    console.log("Generating summary for transcript...")
+    console.log("Generating summary for transcript...");
 
     // Prepare transcript text for GPT
     const transcriptText = transcript.speakers.map((speaker: any) => 
       speaker.segments.map((segment: any) => `${speaker.id}: ${segment.text}`).join('\n')
-    ).join('\n\n')
+    ).join('\n\n');
 
     if (transcriptText.length === 0) {
       return new Response(
@@ -62,7 +66,7 @@ serve(async (req: Request) => {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
-      )
+      );
     }
 
     const prompt = `Please analyze the following meeting transcript and provide a structured summary in JSON format with the following structure:
@@ -99,9 +103,9 @@ serve(async (req: Request) => {
 }
 
 Transcript:
-${transcriptText}`
+${transcriptText}`;
 
-    console.log("Sending summary request to OpenAI GPT...")
+    console.log("Sending summary request to OpenAI GPT...");
 
     // Call OpenAI GPT API
     const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -125,11 +129,13 @@ ${transcriptText}`
         temperature: 0.3,
         max_tokens: 4000,
       }),
-    })
+    });
+
+    console.log("OpenAI GPT API response status:", openaiResponse.status);
 
     if (!openaiResponse.ok) {
-      const errorData = await openaiResponse.json().catch(() => ({}))
-      console.error("OpenAI GPT API error:", errorData)
+      const errorData = await openaiResponse.json().catch(() => ({}));
+      console.error("OpenAI GPT API error:", errorData);
       
       return new Response(
         JSON.stringify({ 
@@ -140,11 +146,11 @@ ${transcriptText}`
           status: openaiResponse.status,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
-      )
+      );
     }
 
-    const gptData = await openaiResponse.json()
-    const summaryText = gptData.choices[0]?.message?.content
+    const gptData = await openaiResponse.json();
+    const summaryText = gptData.choices[0]?.message?.content;
 
     if (!summaryText) {
       return new Response(
@@ -153,34 +159,34 @@ ${transcriptText}`
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
-      )
+      );
     }
 
-    console.log("Summary generated successfully")
+    console.log("Summary generated successfully");
 
     // Parse JSON response
-    let summaryData
+    let summaryData;
     try {
       // Clean the response text to handle potential formatting issues
-      const cleanedText = summaryText.trim()
+      const cleanedText = summaryText.trim();
       
       // Try to extract JSON if it's wrapped in markdown code blocks
-      let jsonText = cleanedText
+      let jsonText = cleanedText;
       if (cleanedText.includes('```json')) {
-        const jsonMatch = cleanedText.match(/```json\s*([\s\S]*?)\s*```/)
+        const jsonMatch = cleanedText.match(/```json\s*([\s\S]*?)\s*```/);
         if (jsonMatch) {
-          jsonText = jsonMatch[1].trim()
+          jsonText = jsonMatch[1].trim();
         }
       } else if (cleanedText.includes('```')) {
-        const jsonMatch = cleanedText.match(/```\s*([\s\S]*?)\s*```/)
+        const jsonMatch = cleanedText.match(/```\s*([\s\S]*?)\s*```/);
         if (jsonMatch) {
-          jsonText = jsonMatch[1].trim()
+          jsonText = jsonMatch[1].trim();
         }
       }
       
-      summaryData = JSON.parse(jsonText)
+      summaryData = JSON.parse(jsonText);
     } catch (parseError) {
-      console.error("Failed to parse summary JSON:", summaryText)
+      console.error("Failed to parse summary JSON:", summaryText);
       
       // Return a fallback summary structure
       summaryData = {
@@ -198,7 +204,7 @@ ${transcriptText}`
           meetingDate: transcript.meetingDate,
           participants: transcript.speakers.map((s: any) => s.id)
         }
-      }
+      };
     }
 
     return new Response(
@@ -206,10 +212,10 @@ ${transcriptText}`
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
-    )
+    );
 
   } catch (error) {
-    console.error("Edge function error:", error)
+    console.error("Edge function error:", error);
     
     return new Response(
       JSON.stringify({ 
@@ -219,6 +225,6 @@ ${transcriptText}`
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
-    )
+    );
   }
-})
+});

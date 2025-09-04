@@ -141,6 +141,13 @@ function App() {
       const hasValidApiKey = apiKeys.openai && apiKeys.openai.trim() !== '' && apiKeys.openai.startsWith('sk-');
       const hasSupabase = checkSupabaseConnection();
       
+      console.log('Processing decision:', {
+        hasValidApiKey,
+        hasSupabase,
+        supabaseUrl: import.meta.env.VITE_SUPABASE_URL ? 'configured' : 'missing',
+        supabaseKey: import.meta.env.VITE_SUPABASE_ANON_KEY ? 'configured' : 'missing'
+      });
+      
       if (!hasValidApiKey) {
         console.log('No valid OpenAI API key provided, using mock transcription');
         transcriptData = await mockTranscribeAudio(file);
@@ -148,13 +155,14 @@ function App() {
         console.log('Using Supabase Edge Function for real transcription');
         try {
           transcriptData = await transcribeAudioViaEdgeFunction(file, apiKeys.openai);
+          console.log('Real transcription successful via edge function');
         } catch (error) {
-          console.warn('Edge function transcription failed, falling back to mock:', error);
-          transcriptData = await mockTranscribeAudio(file);
+          console.error('Edge function transcription failed:', error);
+          throw error; // Don't fall back to mock, show the actual error
         }
       } else {
-        console.log('No Supabase connection, using mock transcription');
-        transcriptData = await mockTranscribeAudio(file);
+        console.log('No Supabase connection detected');
+        throw new Error('Supabase connection required for real transcription. Please click "Connect to Supabase" in the top right to set up your connection.');
       }
       
       console.log('Transcription completed:', transcriptData);
@@ -180,13 +188,14 @@ function App() {
         console.log('Using Supabase Edge Function for real summary generation');
         try {
           summaryData = await generateSummaryViaEdgeFunction(transcriptData, apiKeys.openai);
+          console.log('Real summary generation successful via edge function');
         } catch (transcriptionError) {
-          console.warn('Edge function summary failed, falling back to mock:', error);
-          summaryData = await mockGenerateSummary(transcriptData);
+          console.error('Edge function summary failed:', transcriptionError);
+          throw transcriptionError; // Don't fall back to mock, show the actual error
         }
       } else {
-        console.log('No Supabase connection, using mock summary');
-        summaryData = await mockGenerateSummary(transcriptData);
+        console.log('No Supabase connection detected for summary');
+        throw new Error('Supabase connection required for real summary generation. Please click "Connect to Supabase" in the top right to set up your connection.');
       }
       
       setSummary(summaryData);

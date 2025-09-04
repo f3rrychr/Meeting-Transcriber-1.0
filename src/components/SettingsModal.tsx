@@ -151,8 +151,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ apiKeys, onSave, onClose 
             <h4 className="font-medium text-green-900 mb-2">Supabase Connection Required</h4>
             <div className="text-sm text-green-800 space-y-1">
               <p>• Real transcription requires Supabase Edge Functions</p>
-              <p>• Click "Connect to Supabase" in the top right to set up</p>
-              <p>• Without Supabase, the app will use mock data for testing</p>
+              <p>• Click "Connect to Supabase" button in the top right corner</p>
+              <p>• Edge functions handle OpenAI API calls server-side</p>
+              <p>• This bypasses browser CORS restrictions</p>
             </div>
           </div>
 
