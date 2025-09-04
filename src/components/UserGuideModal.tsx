@@ -91,7 +91,7 @@ const UserGuideModal: React.FC<UserGuideModalProps> = ({ onClose, onOpenSettings
                   Once your API keys are configured, you can upload your meeting audio:
                 </p>
                 <ul className="text-sm text-gray-600 space-y-1 ml-4">
-                  <li>• Supported formats: MP3, WAV, AAC, M4A, OGG</li>
+                  <li>• Supported formats: MP3, WAV, AAC, M4A, OGG, WebM</li>
                   <li>• Maximum file size: 250MB (≈3 hours)</li>
                   <li>• Drag & drop or click "Choose Audio File"</li>
                 </ul>

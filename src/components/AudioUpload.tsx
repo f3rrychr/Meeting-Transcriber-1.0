@@ -14,13 +14,13 @@ const AudioUpload: React.FC<AudioUploadProps> = ({ onFileUpload }) => {
 
   const validateFile = (file: File): string | null => {
     const maxSize = 25 * 1024 * 1024; // 25MB
-    const supportedTypes = ['audio/mpeg', 'audio/wav', 'audio/aac', 'audio/mp4', 'audio/x-m4a', 'audio/ogg'];
+    const supportedTypes = ['audio/mpeg', 'audio/wav', 'audio/aac', 'audio/mp4', 'audio/x-m4a', 'audio/ogg', 'audio/webm'];
     
     if (file.size > maxSize) {
       return 'File size exceeds 25MB limit. Please compress your audio file using external software before uploading.';
     }
     
-    if (!supportedTypes.includes(file.type) && !file.name.match(/\.(mp3|wav|aac|m4a|ogg)$/i)) {
+    if (!supportedTypes.includes(file.type) && !file.name.match(/\.(mp3|wav|aac|m4a|ogg|webm)$/i)) {
       return 'Unsupported file format. Please use MP3, WAV, AAC, M4A, or OGG files.';
     }
     
@@ -106,13 +106,13 @@ const AudioUpload: React.FC<AudioUploadProps> = ({ onFileUpload }) => {
                   <input
                     type="file"
                     className="hidden"
-                    accept=".mp3,.wav,.aac,.m4a,.ogg"
+                    accept=".mp3,.wav,.aac,.m4a,.ogg,.webm"
                     onChange={handleFileSelect}
                   />
                 </label>
                 
                 <div className="text-xs text-gray-500 space-y-1">
-                  <p>Supported formats: MP3, WAV, AAC, M4A, OGG</p>
+                  <p>Supported formats: MP3, WAV, AAC, M4A, OGG, WebM</p>
                   <p>Maximum file size: 25MB</p>
                   <p className="text-amber-600">
                     <strong>Note:</strong> Files over 25MB must be compressed using external tools before uploading

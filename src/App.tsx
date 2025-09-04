@@ -555,7 +555,7 @@ function App() {
         ref={fileInputRef}
         type="file"
         className="hidden"
-        accept=".mp3,.wav,.aac,.m4a,.ogg"
+        accept=".mp3,.wav,.aac,.m4a,.ogg,.webm"
         onChange={handleFileInputChange}
       />
     </div>

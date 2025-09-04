@@ -82,12 +82,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ apiKeys, onSave, onClose 
           {/* Supabase Connection Status */}
           <ConnectionStatus />
 
-          {/* Supabase Connection Status */}
-          <ConnectionStatus />
-
-          {/* Supabase Connection Status */}
-          <ConnectionStatus />
-
           {/* OpenAI API Key */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
