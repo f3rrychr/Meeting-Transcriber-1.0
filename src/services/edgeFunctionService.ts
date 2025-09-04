@@ -173,10 +173,17 @@ export const generateSummaryViaEdgeFunction = async (transcript: TranscriptData,
 };
 
 export const checkSupabaseConnection = (): boolean => {
-  const hasConnection = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
+  const hasConnection = !!(SUPABASE_URL && SUPABASE_ANON_KEY && 
+    SUPABASE_URL !== 'your_supabase_project_url' && 
+    SUPABASE_ANON_KEY !== 'your_supabase_anon_key' &&
+    SUPABASE_URL.startsWith('https://') &&
+    SUPABASE_ANON_KEY.startsWith('eyJ'));
   console.log('Supabase connection check:', {
     hasUrl: !!SUPABASE_URL,
     hasKey: !!SUPABASE_ANON_KEY,
+    isValidUrl: SUPABASE_URL?.startsWith('https://'),
+    isValidKey: SUPABASE_ANON_KEY?.startsWith('eyJ'),
+    isNotPlaceholder: SUPABASE_URL !== 'your_supabase_project_url',
     connected: hasConnection
   });
   return hasConnection;
