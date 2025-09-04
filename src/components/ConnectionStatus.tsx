@@ -1,0 +1,193 @@
+import React, { useState, useEffect } from 'react';
+import { CheckCircle, XCircle, AlertCircle, RefreshCw } from 'lucide-react';
+
+const ConnectionStatus: React.FC = () => {
+  const [supabaseStatus, setSupabaseStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
+  const [envVars, setEnvVars] = useState<{
+    url: string | undefined;
+    key: string | undefined;
+  }>({
+    url: undefined,
+    key: undefined
+  });
+
+  useEffect(() => {
+    checkConnection();
+  }, []);
+
+  const checkConnection = async () => {
+    setSupabaseStatus('checking');
+    
+    // Check environment variables
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    
+    setEnvVars({
+      url: supabaseUrl,
+      key: supabaseKey
+    });
+
+    console.log('Supabase Environment Check:', {
+      hasUrl: !!supabaseUrl,
+      hasKey: !!supabaseKey,
+      urlValue: supabaseUrl ? `${supabaseUrl.substring(0, 20)}...` : 'undefined',
+      keyValue: supabaseKey ? `${supabaseKey.substring(0, 10)}...` : 'undefined'
+    });
+
+    if (!supabaseUrl || !supabaseKey) {
+      setSupabaseStatus('disconnected');
+      return;
+    }
+
+    // Test edge function connectivity
+    try {
+      const testUrl = `${supabaseUrl}/functions/v1/transcribe-audio`;
+      console.log('Testing edge function connectivity to:', testUrl);
+      
+      const response = await fetch(testUrl, {
+        method: 'OPTIONS',
+        headers: {
+          'Authorization': `Bearer ${supabaseKey}`,
+        },
+      });
+
+      console.log('Edge function test response:', {
+        status: response.status,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+
+      if (response.ok || response.status === 200) {
+        setSupabaseStatus('connected');
+      } else {
+        setSupabaseStatus('disconnected');
+      }
+    } catch (error) {
+      console.error('Edge function connectivity test failed:', error);
+      setSupabaseStatus('disconnected');
+    }
+  };
+
+  const getStatusIcon = () => {
+    switch (supabaseStatus) {
+      case 'checking':
+        return <RefreshCw className="w-5 h-5 text-blue-500 animate-spin" />;
+      case 'connected':
+        return <CheckCircle className="w-5 h-5 text-green-500" />;
+      case 'disconnected':
+        return <XCircle className="w-5 h-5 text-red-500" />;
+    }
+  };
+
+  const getStatusText = () => {
+    switch (supabaseStatus) {
+      case 'checking':
+        return 'Checking connection...';
+      case 'connected':
+        return 'Supabase Connected';
+      case 'disconnected':
+        return 'Supabase Not Connected';
+    }
+  };
+
+  const getStatusColor = () => {
+    switch (supabaseStatus) {
+      case 'checking':
+        return 'text-blue-600';
+      case 'connected':
+        return 'text-green-600';
+      case 'disconnected':
+        return 'text-red-600';
+    }
+  };
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg p-6">
+      <h3 className="text-lg font-semibold text-gray-900 mb-4">Supabase Connection Status</h3>
+      
+      <div className="space-y-4">
+        {/* Overall Status */}
+        <div className="flex items-center space-x-3">
+          {getStatusIcon()}
+          <span className={`font-medium ${getStatusColor()}`}>
+            {getStatusText()}
+          </span>
+          <button
+            onClick={checkConnection}
+            className="ml-auto px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+          >
+            Refresh
+          </button>
+        </div>
+
+        {/* Environment Variables Check */}
+        <div className="bg-gray-50 rounded-lg p-4">
+          <h4 className="font-medium text-gray-800 mb-3">Environment Variables</h4>
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center justify-between">
+              <span>VITE_SUPABASE_URL:</span>
+              <span className={envVars.url ? 'text-green-600' : 'text-red-600'}>
+                {envVars.url ? '✓ Set' : '✗ Missing'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>VITE_SUPABASE_ANON_KEY:</span>
+              <span className={envVars.key ? 'text-green-600' : 'text-red-600'}>
+                {envVars.key ? '✓ Set' : '✗ Missing'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Connection Details */}
+        {envVars.url && (
+          <div className="bg-blue-50 rounded-lg p-4">
+            <h4 className="font-medium text-blue-800 mb-2">Connection Details</h4>
+            <div className="text-sm text-blue-700 space-y-1">
+              <p>Project URL: {envVars.url}</p>
+              <p>Edge Functions: {envVars.url}/functions/v1/</p>
+            </div>
+          </div>
+        )}
+
+        {/* Instructions */}
+        {supabaseStatus === 'disconnected' && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+            <div className="flex items-start">
+              <AlertCircle className="w-5 h-5 text-amber-600 mr-2 mt-0.5 flex-shrink-0" />
+              <div>
+                <h4 className="font-medium text-amber-900 mb-1">Setup Required</h4>
+                <p className="text-sm text-amber-800 mb-2">
+                  To use real transcription, you need to connect to Supabase:
+                </p>
+                <ol className="text-sm text-amber-800 space-y-1 ml-4">
+                  <li>1. Click "Connect to Supabase" in the top right corner</li>
+                  <li>2. Follow the setup wizard to create/connect your project</li>
+                  <li>3. Environment variables will be automatically configured</li>
+                  <li>4. Add your OpenAI API key in Settings</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {supabaseStatus === 'connected' && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className="flex items-start">
+              <CheckCircle className="w-5 h-5 text-green-600 mr-2 mt-0.5 flex-shrink-0" />
+              <div>
+                <h4 className="font-medium text-green-900 mb-1">Ready for Real Transcription</h4>
+                <p className="text-sm text-green-800">
+                  Supabase is connected and edge functions are accessible. 
+                  Make sure you have a valid OpenAI API key in Settings to use real transcription.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default ConnectionStatus;
