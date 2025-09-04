@@ -21,30 +21,43 @@ interface GroupedActionItems {
 const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
   const [groupedActionItems, setGroupedActionItems] = useState<GroupedActionItems[]>([]);
   const [loading, setLoading] = useState(true);
+  const [debugInfo, setDebugInfo] = useState<string>('');
 
   useEffect(() => {
     const loadActionItems = () => {
+      let debugLog = 'Action Tracker Debug Log:\n';
       try {
         // Load all transcription records
         const records = TranscriptionStorage.getTranscriptions();
-        console.log('Loading action items from', records.length, 'records');
-        console.log('Raw records:', records);
+        debugLog += `Found ${records.length} transcription records\n`;
+        console.log('ActionTracker: Loading action items from', records.length, 'records');
+        console.log('ActionTracker: Raw records:', records);
         
         const allActionItems: ActionItemWithSource[] = [];
 
         records.forEach((record, recordIndex) => {
-          console.log(`Processing record ${recordIndex}:`, {
+          debugLog += `\nRecord ${recordIndex + 1}:\n`;
+          debugLog += `  ID: ${record.id}\n`;
+          debugLog += `  Title: ${record.title}\n`;
+          debugLog += `  Date: ${record.date}\n`;
+          debugLog += `  Has Summary: ${!!record.summary}\n`;
+          
+          const recordDebug = {
             id: record.id,
             title: record.title,
+            date: record.date,
             hasSummary: !!record.summary,
             hasActionItems: !!(record.summary?.actionItems),
             actionItemsLength: record.summary?.actionItems?.length || 0,
             actionItems: record.summary?.actionItems
-          });
+          };
+          console.log(`ActionTracker: Processing record ${recordIndex}:`, recordDebug);
           
           if (record.summary && record.summary.actionItems && Array.isArray(record.summary.actionItems)) {
+            debugLog += `  Action Items: ${record.summary.actionItems.length}\n`;
             record.summary.actionItems.forEach((item, itemIndex) => {
-              console.log(`Processing action item ${itemIndex}:`, item);
+              debugLog += `    ${itemIndex + 1}. ${item.task} (${item.assignee})\n`;
+              console.log(`ActionTracker: Processing action item ${itemIndex}:`, item);
               const actionItemWithSource: ActionItemWithSource = {
                 task: item.task || 'No task description',
                 assignee: item.assignee || 'Unassigned',
@@ -58,16 +71,19 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
               allActionItems.push(actionItemWithSource);
             });
           } else {
-            console.log(`Record ${recordIndex} has no valid action items:`, {
+            debugLog += `  No action items found\n`;
+            const noActionItemsDebug = {
               hasSummary: !!record.summary,
               summaryKeys: record.summary ? Object.keys(record.summary) : [],
               actionItems: record.summary?.actionItems
-            });
+            };
+            console.log(`ActionTracker: Record ${recordIndex} has no valid action items:`, noActionItemsDebug);
           }
         });
 
-        console.log('Total action items found:', allActionItems.length);
-        console.log('All action items:', allActionItems);
+        debugLog += `\nTotal Action Items Found: ${allActionItems.length}\n`;
+        console.log('ActionTracker: Total action items found:', allActionItems.length);
+        console.log('ActionTracker: All action items:', allActionItems);
 
         // Group action items by date
         const groupedByDate = allActionItems.reduce((groups, item) => {
@@ -79,7 +95,8 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
           return groups;
         }, {} as Record<string, ActionItemWithSource[]>);
 
-        console.log('Grouped by date:', groupedByDate);
+        debugLog += `Grouped into ${Object.keys(groupedByDate).length} date groups\n`;
+        console.log('ActionTracker: Grouped by date:', groupedByDate);
 
         // Convert to array and sort by date (most recent first)
         const groupedArray: GroupedActionItems[] = Object.entries(groupedByDate)
@@ -90,9 +107,12 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
             return dateB.getTime() - dateA.getTime();
           });
         
-        console.log('Grouped action items:', groupedArray);
+        debugLog += `Final grouped array length: ${groupedArray.length}\n`;
+        console.log('ActionTracker: Final grouped action items:', groupedArray);
+        setDebugInfo(debugLog);
         setGroupedActionItems(groupedArray);
       } catch (error) {
+        debugLog += `Error: ${error}\n`;
         console.error('Error loading action items:', error);
         setGroupedActionItems([]);
       } finally {
@@ -134,6 +154,30 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
         
         <div className="p-6">
           {groupedActionItems.length > 0 ? (
+            <>
+              {/* Debug Info - Remove this after fixing */}
+              <details className="mb-4 p-3 bg-gray-50 rounded border">
+                <summary className="cursor-pointer text-sm font-medium text-gray-700">
+                  Debug Information (Click to expand)
+                </summary>
+                <pre className="mt-2 text-xs text-gray-600 whitespace-pre-wrap max-h-40 overflow-y-auto">
+                  {debugInfo}
+                </pre>
+                <div className="mt-2 text-xs text-gray-600">
+                  <p>Grouped Action Items State: {JSON.stringify(groupedActionItems, null, 2)}</p>
+                </div>
+              </details>
+              
+              {/* Show raw localStorage data for debugging */}
+              <details className="mb-4 p-3 bg-blue-50 rounded border">
+                <summary className="cursor-pointer text-sm font-medium text-blue-700">
+                  Raw localStorage Data (Click to expand)
+                </summary>
+                <pre className="mt-2 text-xs text-blue-600 whitespace-pre-wrap max-h-40 overflow-y-auto">
+                  {JSON.stringify(TranscriptionStorage.getTranscriptions(), null, 2)}
+                </pre>
+              </details>
+
             <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full">
@@ -229,7 +273,22 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
                 </table>
               </div>
             </div>
+            </>
           ) : (
+            <>
+              {/* Debug Info for empty state */}
+              <details className="mb-4 p-3 bg-yellow-50 rounded border">
+                <summary className="cursor-pointer text-sm font-medium text-yellow-700">
+                  Debug Information - No Action Items (Click to expand)
+                </summary>
+                <pre className="mt-2 text-xs text-yellow-600 whitespace-pre-wrap max-h-40 overflow-y-auto">
+                  {debugInfo}
+                </pre>
+                <div className="mt-2 text-xs text-yellow-600">
+                  <p>Raw Records: {JSON.stringify(TranscriptionStorage.getTranscriptions(), null, 2)}</p>
+                </div>
+              </details>
+              
             <div className="text-center py-12">
               <CheckSquare className="w-16 h-16 mx-auto mb-4 text-gray-300" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">No Action Items Found</h3>
@@ -240,6 +299,7 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
                 Process some meeting audio files to see action items here.
               </p>
             </div>
+            </>
           )}
         </div>
         
