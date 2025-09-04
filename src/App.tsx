@@ -181,8 +181,6 @@ function App() {
       }
 
       // Check if Supabase is connected before attempting summary generation
-      const hasSupabaseConnection = checkSupabaseConnection();
-      
       if (!hasSupabaseConnection) {
         throw new EdgeFunctionError('Supabase connection is required for summary generation. Please click "Connect to Supabase" in the top right corner.');
       }
