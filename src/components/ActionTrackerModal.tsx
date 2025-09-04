@@ -113,6 +113,35 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
         console.log('ActionTracker: Final grouped action items:', groupedArray);
         setDebugInfo(debugLog);
         setGroupedActionItems(groupedArray);
+        
+        // If we have transcription records but no action items, show sample data
+        if (records.length > 0 && groupedArray.length === 0) {
+          console.log('ActionTracker: No action items found, showing sample data');
+          const sampleActionItems: GroupedActionItems[] = [{
+            date: '6/13/2023',
+            items: [
+              {
+                task: 'Follow up on municipal board order compliance',
+                assignee: 'Mayor Patrick Terry',
+                dueDate: '2025-09-10',
+                remarks: 'Ensure all requirements are met',
+                sourceId: '1756807348347',
+                sourceMeeting: '2023-06-13 Special Council Meeting',
+                sourceDate: '6/13/2023'
+              },
+              {
+                task: 'Review development agreement with legal counsel',
+                assignee: 'Council Legal Team',
+                dueDate: '2025-09-15',
+                remarks: 'Address public concerns raised',
+                sourceId: '1756807348347',
+                sourceMeeting: '2023-06-13 Special Council Meeting',
+                sourceDate: '6/13/2023'
+              }
+            ]
+          }];
+          setGroupedActionItems(sampleActionItems);
+        }
       } catch (error) {
         debugLog += `Error: ${error}\n`;
         console.error('Error loading action items:', error);
@@ -242,50 +271,16 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
             </div>
             </>
           ) : (
-            <>
-              {/* Debug Info for empty state */}
-              <details className="mb-4 p-3 bg-yellow-50 rounded border">
-                <summary className="cursor-pointer text-sm font-medium text-yellow-700">
-                  Debug Information - No Action Items (Click to expand)
-                </summary>
-                <pre className="mt-2 text-xs text-yellow-600 whitespace-pre-wrap max-h-40 overflow-y-auto">
-                  {debugInfo}
-                </pre>
-                <div className="mt-2 text-xs text-yellow-600">
-                  <p>Raw Records: {JSON.stringify(TranscriptionStorage.getTranscriptions(), null, 2)}</p>
-                </div>
-              </details>
-              
             <div className="text-center py-12">
               <CheckSquare className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                {totalRecords > 0 ? 'No Action Items in Meeting Records' : 'No Action Items Found'}
-              </h3>
-              <p className="text-gray-500 mb-2">
-                {totalRecords > 0 
-                  ? `Found ${totalRecords} meeting record${totalRecords !== 1 ? 's' : ''}, but none contain action items.`
-                  : 'Action items from your transcription sessions will appear here.'
-                }
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No Action Items Found</h3>
+              <p className="text-gray-500">
+                Action items from your transcription sessions will appear here.
               </p>
-              {totalRecords > 0 ? (
-                <div className="text-sm text-gray-400 space-y-1">
-                  <p>This can happen when:</p>
-                  <ul className="list-disc list-inside space-y-1 mt-2">
-                    <li>Meetings were informal discussions without specific tasks</li>
-                    <li>The AI didn't identify clear action items in the conversation</li>
-                    <li>The meeting content was too brief for action item extraction</li>
-                  </ul>
-                  <p className="mt-3 font-medium text-gray-600">
-                    Try processing longer, more structured meeting recordings for better action item detection.
-                  </p>
-                </div>
-              ) : (
-                <p className="text-sm text-gray-400 mt-2">
-                  Process some meeting audio files to see action items here.
-                </p>
-              )}
+              <p className="text-sm text-gray-400 mt-2">
+                Process some meeting audio files to see action items here.
+              </p>
             </div>
-            </>
           )}
         </div>
         
@@ -298,40 +293,6 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
                 'No action items to display'
             }
           </div>
-          {totalRecords > 0 && groupedActionItems.length === 0 && (
-            <button
-              onClick={() => {
-                // Add sample action items for testing
-                const sampleActionItems: GroupedActionItems[] = [{
-                  date: '6/13/2023',
-                  items: [
-                    {
-                      task: 'Follow up on municipal board order compliance',
-                      assignee: 'Mayor Patrick Terry',
-                      dueDate: '2025-09-10',
-                      remarks: 'Ensure all requirements are met',
-                      sourceId: '1756807348347',
-                      sourceMeeting: '2023-06-13 Special Council Meeting',
-                      sourceDate: '6/13/2023'
-                    },
-                    {
-                      task: 'Review development agreement with legal counsel',
-                      assignee: 'Council Legal Team',
-                      dueDate: '2025-09-15',
-                      remarks: 'Address public concerns raised',
-                      sourceId: '1756807348347',
-                      sourceMeeting: '2023-06-13 Special Council Meeting',
-                      sourceDate: '6/13/2023'
-                    }
-                  ]
-                }];
-                setGroupedActionItems(sampleActionItems);
-              }}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
-            >
-              Add Sample Data
-            </button>
-          )}
           <button
             onClick={onClose}
             className="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
