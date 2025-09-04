@@ -81,39 +81,11 @@ function App() {
   }, []);
 
   const handleFileUpload = async (file: File) => {
-    console.log('handleFileUpload called with file:', file.name);
-    console.log('File details:', {
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      lastModified: file.lastModified
-    });
-    console.log('Current API keys:', {
-      hasOpenAI: !!apiKeys.openai,
-      hasHuggingFace: !!apiKeys.huggingface,
-      openAIValid: apiKeys.openai?.startsWith('sk-'),
-      hfValid: apiKeys.huggingface?.startsWith('hf_')
-    });
-    
     // Prevent multiple simultaneous uploads
     if (isProcessing) {
-      console.log('Already processing, ignoring new upload');
       return;
     }
 
-    // Validate API keys before processing
-    const validation = validateAPIKeys(apiKeys);
-    console.log('API key validation result:', validation);
-    
-    if (!validation.isValid) {
-      console.error('API validation failed:', validation.errors);
-      setProcessingError(`API Keys Required: ${validation.errors.join(', ')}`);
-      setShowSettings(true);
-      return;
-    }
-
-    console.log('Starting file processing with valid API keys...');
-    
     setIsProcessing(true);
     setCurrentFile(file);
     setProcessingState('processing');
@@ -123,16 +95,8 @@ function App() {
     setSummary(null);
     setViewingRecord(null);
     
-    console.log('Starting audio file processing...');
-    try {
-      await processAudioFile(file);
-    } catch (error) {
-      console.error('Critical error in handleFileUpload:', error);
-      setProcessingState('error');
-      setProcessingError(`Critical processing error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsProcessing(false);
-    }
+    await processAudioFile(file);
+    setIsProcessing(false);
   };
 
   const triggerFileSelect = () => {
@@ -169,34 +133,29 @@ function App() {
       processingStep = 'transcription';
       console.log('Step 2: Starting transcription...');
       setProgress(10);
-      console.log('Starting transcription with OpenAI Whisper...');
       
-      // Use mock service if no API key is provided or if we detect CORS issues
       let transcriptData: TranscriptData;
-      if (!apiKeys.openai || apiKeys.openai.trim() === '') {
+      
+      // Check if we should use mock service
+      const shouldUseMock = !apiKeys.openai || apiKeys.openai.trim() === '' || !apiKeys.openai.startsWith('sk-');
+      
+      if (shouldUseMock) {
         console.log('No OpenAI API key provided, using mock transcription');
         transcriptData = await mockTranscribeAudio(file);
       } else {
+        console.log('Starting transcription with OpenAI Whisper...');
         try {
-          console.log('Calling transcribeAudio with:', {
-            fileName: file.name,
-            fileSize: file.size,
-            apiKeyLength: apiKeys.openai?.length
-          });
           transcriptData = await transcribeAudio(file, apiKeys.openai);
-          console.log('Transcription successful, received data:', transcriptData);
         } catch (transcriptionError) {
-          console.error('Transcription failed:', transcriptionError);
-          if (transcriptionError instanceof APIError && transcriptionError.message.includes('CORS')) {
+          console.warn('Real API transcription failed, falling back to mock:', transcriptionError);
+          if (transcriptionError instanceof APIError && 
+              (transcriptionError.message.includes('CORS') || 
+               transcriptionError.message.includes('Network error') ||
+               transcriptionError.message.includes('fetch'))) {
             console.log('CORS error detected, falling back to mock transcription');
             transcriptData = await mockTranscribeAudio(file);
           } else {
-            console.error('Transcription error details:', {
-              name: transcriptionError instanceof Error ? transcriptionError.name : 'Unknown',
-              message: transcriptionError instanceof Error ? transcriptionError.message : 'Unknown error',
-              stack: transcriptionError instanceof Error ? transcriptionError.stack : 'No stack'
-            });
-            throw new Error(`Transcription failed at step ${processingStep}: ${transcriptionError instanceof Error ? transcriptionError.message : 'Unknown error'}`);
+            throw transcriptionError;
           }
         }
       }
@@ -208,16 +167,13 @@ function App() {
       processingStep = 'speaker diarization';
       console.log('Step 3: Starting speaker diarization...');
       setProgress(50);
-      console.log('Starting speaker diarization...');
       let diarizedTranscript;
       try {
         diarizedTranscript = await diarizeSpeakers(file, transcriptData, apiKeys.huggingface);
-        console.log('Diarization successful:', diarizedTranscript);
       } catch (diarizationError) {
         console.warn('Diarization failed, using original transcript:', diarizationError);
         diarizedTranscript = transcriptData; // Fallback to original transcript
       }
-      console.log('Diarization completed:', diarizedTranscript);
       setTranscript(diarizedTranscript);
       setProgress(70);
 
@@ -225,43 +181,36 @@ function App() {
       processingStep = 'summary generation';
       console.log('Step 4: Starting summary generation...');
       setProgress(80);
-      console.log('Starting summary generation...');
       
-      // Use mock service if no API key is provided or if we're using mock transcription
       let summaryData: SummaryData;
-      if (!apiKeys.openai || apiKeys.openai.trim() === '' || diarizedTranscript.meetingTitle.includes('Mock Transcription')) {
+      
+      if (shouldUseMock || diarizedTranscript.meetingTitle.includes('Mock Transcription')) {
         console.log('Using mock summary generation');
         summaryData = await mockGenerateSummary(diarizedTranscript);
       } else {
         try {
           summaryData = await generateSummary(diarizedTranscript, apiKeys.openai);
-          console.log('Summary generation successful:', summaryData);
         } catch (summaryError) {
-          if (summaryError instanceof APIError && summaryError.message.includes('CORS')) {
+          console.warn('Real API summary failed, falling back to mock:', summaryError);
+          if (summaryError instanceof APIError && 
+              (summaryError.message.includes('CORS') || 
+               summaryError.message.includes('Network error') ||
+               summaryError.message.includes('fetch'))) {
             console.log('CORS error detected, falling back to mock summary');
             summaryData = await mockGenerateSummary(diarizedTranscript);
           } else {
-            console.error('Summary generation failed:', summaryError);
-            console.error('Summary error details:', {
-              name: summaryError instanceof Error ? summaryError.name : 'Unknown',
-              message: summaryError instanceof Error ? summaryError.message : 'Unknown error'
-            });
-            throw new Error(`Summary generation failed at step ${processingStep}: ${summaryError instanceof Error ? summaryError.message : 'Unknown error'}`);
+            throw summaryError;
           }
         }
       }
       
-      console.log('Summary completed:', summaryData);
       setSummary(summaryData);
       setProgress(100);
       
-      console.log('All processing steps completed successfully');
       setProcessingState('completed');
       
       // Save transcription to history
-      console.log('Saving transcription to history...');
       TranscriptionStorage.saveTranscription(file.name, diarizedTranscript, summaryData);
-      console.log('Transcription saved to history');
       
       // Show success notification
       if ('Notification' in window && Notification.permission === 'granted') {
@@ -271,19 +220,11 @@ function App() {
         });
       }
     } catch (error) {
-      console.error('Processing error:', error);
-      console.error('Processing failed at step:', processingStep);
-      console.error('Full error details:', {
-        name: error instanceof Error ? error.name : 'Unknown',
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : 'No stack'
-      });
-      
-      // Ensure we don't reset state unexpectedly
+      console.error('Processing failed at step:', processingStep, error);
       setProcessingState('error');
       
       if (error instanceof APIError) {
-        setProcessingError(`${error.apiType?.toUpperCase()} API Error at ${processingStep}: ${error.message}`);
+        setProcessingError(`API Error: ${error.message}`);
         
         // If it's an API key error, open settings
         if (error.statusCode === 401) {
@@ -292,9 +233,6 @@ function App() {
       } else {
         setProcessingError(`Processing failed at ${processingStep}: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
-
-      // Re-throw to be caught by handleFileUpload
-      throw error;
     }
   };
 
