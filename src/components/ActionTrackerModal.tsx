@@ -157,29 +157,6 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
         <div className="p-6">
           {groupedActionItems.length > 0 ? (
             <>
-              {/* Debug Info - Remove this after fixing */}
-              <details className="mb-4 p-3 bg-gray-50 rounded border">
-                <summary className="cursor-pointer text-sm font-medium text-gray-700">
-                  Debug Information (Click to expand)
-                </summary>
-                <pre className="mt-2 text-xs text-gray-600 whitespace-pre-wrap max-h-40 overflow-y-auto">
-                  {debugInfo}
-                </pre>
-                <div className="mt-2 text-xs text-gray-600">
-                  <p>Grouped Action Items State: {JSON.stringify(groupedActionItems, null, 2)}</p>
-                </div>
-              </details>
-              
-              {/* Show raw localStorage data for debugging */}
-              <details className="mb-4 p-3 bg-blue-50 rounded border">
-                <summary className="cursor-pointer text-sm font-medium text-blue-700">
-                  Raw localStorage Data (Click to expand)
-                </summary>
-                <pre className="mt-2 text-xs text-blue-600 whitespace-pre-wrap max-h-40 overflow-y-auto">
-                  {JSON.stringify(TranscriptionStorage.getTranscriptions(), null, 2)}
-                </pre>
-              </details>
-
             <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full">
