@@ -66,8 +66,8 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
                 dueDate: item.dueDate || 'No due date',
                 remarks: item.remarks || '',
                 sourceId: record.id,
-                sourceMeeting: record.title || 'Untitled Meeting',
-                sourceDate: record.date || 'Unknown Date'
+                sourceMeeting: record.transcript?.meetingTitle || record.title || 'Untitled Meeting',
+                sourceDate: record.transcript?.meetingDate || record.date || 'Unknown Date'
               };
               
               allActionItems.push(actionItemWithSource);
@@ -238,12 +238,8 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
                             </td>
                             <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
                               {isFirstItemOfDate && (
-                                <div className="font-medium text-blue-700 mb-1">
-                                  {new Date(group.date).toLocaleDateString('en-US', {
-                                    year: 'numeric',
-                                    month: 'short',
-                                    day: 'numeric'
-                                  })}
+                                <div className="font-medium text-blue-700 mb-1 text-xs">
+                                  {group.date}
                                   <span className="ml-2 text-xs text-gray-500">
                                     ({group.items.length} item{group.items.length !== 1 ? 's' : ''})
                                   </span>
@@ -251,7 +247,7 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
                               )}
                             </td>
                             <td className="px-4 py-4 text-sm text-gray-900">
-                              <div className="font-medium text-gray-800 mb-1">{item.sourceMeeting}</div>
+                              <div className="font-medium text-gray-800 mb-1 text-xs">{item.sourceMeeting}</div>
                               <div className="text-gray-700">{item.task}</div>
                             </td>
                             <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
@@ -338,7 +334,7 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
               onClick={() => {
                 // Add sample action items for testing
                 const sampleActionItems: GroupedActionItems[] = [{
-                  date: '2025-09-02',
+                  date: '6/13/2023',
                   items: [
                     {
                       task: 'Follow up on municipal board order compliance',
@@ -347,7 +343,7 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
                       remarks: 'Ensure all requirements are met',
                       sourceId: '1756807348347',
                       sourceMeeting: '2023-06-13 Special Council Meeting',
-                      sourceDate: '2025-09-02'
+                      sourceDate: '6/13/2023'
                     },
                     {
                       task: 'Review development agreement with legal counsel',
@@ -356,7 +352,7 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
                       remarks: 'Address public concerns raised',
                       sourceId: '1756807348347',
                       sourceMeeting: '2023-06-13 Special Council Meeting',
-                      sourceDate: '2025-09-02'
+                      sourceDate: '6/13/2023'
                     }
                   ]
                 }];
