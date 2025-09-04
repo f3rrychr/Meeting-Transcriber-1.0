@@ -72,6 +72,13 @@ function App() {
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Request notification permission on app load
+  React.useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
+
   const handleFileUpload = async (file: File) => {
     console.log('handleFileUpload called with file:', file.name);
     console.log('File details:', {
@@ -106,12 +113,6 @@ function App() {
 
     console.log('Starting file processing with valid API keys...');
     
-    if (!validation.isValid) {
-      setProcessingError(`API Keys Required: ${validation.errors.join(', ')}`);
-      setShowSettings(true);
-      return;
-    }
-
     setIsProcessing(true);
     setCurrentFile(file);
     setProcessingState('processing');
@@ -119,6 +120,7 @@ function App() {
     setProcessingError(null);
     setTranscript(null);
     setSummary(null);
+    setViewingRecord(null);
     
     console.log('Starting audio file processing...');
     try {
@@ -493,6 +495,7 @@ function App() {
   };
 
   const handleViewTranscription = (record: any) => {
+    setShowTranscriptionHistory(false);
     setTranscript(record.transcript);
     setSummary(record.summary);
     setCurrentFile(new File([], record.fileName));
@@ -501,6 +504,7 @@ function App() {
   };
 
   const handleViewSummary = (record: any) => {
+    setShowTranscriptionHistory(false);
     setTranscript(record.transcript);
     setSummary(record.summary);
     setCurrentFile(new File([], record.fileName));

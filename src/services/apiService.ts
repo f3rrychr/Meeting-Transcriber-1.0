@@ -19,23 +19,6 @@ export const transcribeAudio = async (file: File, apiKey: string): Promise<Trans
   console.log('transcribeAudio called with file:', file.name, 'size:', file.size);
   console.log('API key provided:', apiKey ? 'Yes' : 'No', 'starts with sk-:', apiKey?.startsWith('sk-'));
   
-  // Check network connectivity first
-  try {
-    console.log('Testing network connectivity...');
-    const connectivityTest = await fetch('https://httpbin.org/get', { 
-      method: 'GET',
-      signal: AbortSignal.timeout(5000) // 5 second timeout
-    });
-    console.log('Network connectivity test result:', connectivityTest.ok);
-  } catch (connectivityError) {
-    console.error('Network connectivity test failed:', connectivityError);
-    throw new APIError(
-      'No internet connection detected. Please check your network connection and try again.',
-      0,
-      'network'
-    );
-  }
-
   // Add timeout to prevent hanging
   const controller = new AbortController();
   const timeoutId = setTimeout(() => {
@@ -89,15 +72,6 @@ export const transcribeAudio = async (file: File, apiKey: string): Promise<Trans
     fileName: processedFile.name
   });
   
-  // Log request details for debugging
-  console.log('Request details:', {
-    url: 'https://api.openai.com/v1/audio/transcriptions',
-    method: 'POST',
-    hasAuthHeader: !!apiKey,
-    fileSize: processedFile.size,
-    fileName: processedFile.name
-  });
-  
   try {
     const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
@@ -120,7 +94,7 @@ export const transcribeAudio = async (file: File, apiKey: string): Promise<Trans
       // Handle specific OpenAI error types
       if (response.status === 0) {
         throw new APIError(
-          'Unable to reach OpenAI servers. This could be due to network issues, firewall restrictions, or OpenAI service outage.',
+          'Unable to reach OpenAI servers. This could be due to CORS restrictions in the browser, network issues, firewall restrictions, or OpenAI service outage. Try using the application from a different network or contact your IT administrator.',
           response.status,
           'openai'
         );
@@ -129,38 +103,6 @@ export const transcribeAudio = async (file: File, apiKey: string): Promise<Trans
       if (response.status === 401) {
         throw new APIError(
           'Invalid OpenAI API key. Please check your API key in Settings and ensure it has sufficient permissions.',
-          response.status,
-          'openai'
-        );
-      }
-      
-      if (response.status === 429) {
-        throw new APIError(
-          'OpenAI API quota exceeded. Please check your billing and usage limits at https://platform.openai.com/usage',
-          response.status,
-          'openai'
-        );
-      }
-      
-      if (response.status >= 500) {
-        throw new APIError(
-          'OpenAI service is temporarily unavailable. Please try again in a few minutes.',
-          response.status,
-          'openai'
-        );
-      }
-      
-      if (response.status === 413) {
-        throw new APIError(
-          `File too large for OpenAI API. Maximum size is 25MB. Your file: ${AudioProcessor.formatFileSize(processedFile.size)}`,
-          response.status,
-          'openai'
-        );
-      }
-      
-      if (response.status === 415) {
-        throw new APIError(
-          'Unsupported audio format. Please use MP3, WAV, M4A, or other supported formats.',
           response.status,
           'openai'
         );
