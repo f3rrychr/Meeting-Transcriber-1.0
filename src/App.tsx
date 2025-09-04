@@ -604,7 +604,6 @@ function App() {
                     Check API Settings
                   </button>
                 ) : null}
-                )}
               </div>
             </div>
           </div>
