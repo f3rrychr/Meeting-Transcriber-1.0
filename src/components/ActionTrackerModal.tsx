@@ -193,12 +193,6 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         <div className="flex items-center">
-                          <Calendar className="w-4 h-4 mr-1" />
-                          Meeting Date
-                        </div>
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        <div className="flex items-center">
                           <FileText className="w-4 h-4 mr-1" />
                           Meeting & Action Item
                         </div>
@@ -235,16 +229,6 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
                           <tr key={`${item.sourceId}-${itemIndex}`} className="hover:bg-gray-50 transition-colors">
                             <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                               {currentItemNumber}
-                            </td>
-                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                              {isFirstItemOfDate && (
-                                <div className="font-medium text-blue-700 mb-1 text-xs">
-                                  {group.date}
-                                  <span className="ml-2 text-xs text-gray-500">
-                                    ({group.items.length} item{group.items.length !== 1 ? 's' : ''})
-                                  </span>
-                                </div>
-                              )}
                             </td>
                             <td className="px-4 py-4 text-sm text-gray-900">
                               <div className="font-medium text-gray-800 mb-1 text-xs">{item.sourceMeeting}</div>
