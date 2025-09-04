@@ -587,7 +587,7 @@ function App() {
                 >
                   Try Again
                 </button>
-                {/* Network-specific help */}
+                {processingError?.includes('OpenAI API quota exceeded') || processingError?.includes('429') ? (
                   <a
                     href="https://platform.openai.com/usage"
                     target="_blank"
@@ -603,6 +603,7 @@ function App() {
                   >
                     Check API Settings
                   </button>
+                ) : null}
                 )}
               </div>
             </div>
