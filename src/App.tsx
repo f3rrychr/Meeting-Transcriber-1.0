@@ -603,6 +603,21 @@ function App() {
                     </div>
                   </div>
                 ) : processingError?.includes('quota') || processingError?.includes('billing') ? (
+                {processingError?.includes('Network error') || processingError?.includes('network') || processingError?.includes('connectivity') ? (
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => window.open('https://status.openai.com/', '_blank')}
+                      className="w-full px-4 py-2 border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-50 transition-colors"
+                    >
+                      Check OpenAI Service Status
+                    </button>
+                    <div className="text-xs text-gray-500 space-y-1">
+                      <p>• Check your internet connection</p>
+                      <p>• Try disabling VPN if using one</p>
+                      <p>• Check if your firewall blocks OpenAI</p>
+                    </div>
+                  </div>
+                ) : processingError?.includes('quota') || processingError?.includes('billing') ? (
                   <a
                     href="https://platform.openai.com/usage"
                     target="_blank"
@@ -611,6 +626,13 @@ function App() {
                   >
                     Check OpenAI Usage & Billing
                   </a>
+                ) : processingError?.includes('Invalid OpenAI API key') || processingError?.includes('401') ? (
+                  <button
+                    onClick={() => setShowSettings(true)}
+                    className="w-full px-4 py-2 border border-orange-300 text-orange-700 rounded-lg hover:bg-orange-50 transition-colors"
+                  >
+                    Update API Key
+                  </button>
                 ) : processingError?.includes('Invalid OpenAI API key') || processingError?.includes('401') ? (
                   <button
                     onClick={() => setShowSettings(true)}
