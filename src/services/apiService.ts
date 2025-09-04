@@ -36,8 +36,30 @@ export const transcribeAudio = async (file: File, apiKey: string): Promise<Trans
     );
   }
 
+  // Check network connectivity first
+  try {
+    console.log('Testing network connectivity...');
+    const connectivityTest = await fetch('https://httpbin.org/get', { 
+      method: 'GET',
+      signal: AbortSignal.timeout(5000) // 5 second timeout
+    });
+    console.log('Network connectivity test result:', connectivityTest.ok);
+  } catch (connectivityError) {
+    console.error('Network connectivity test failed:', connectivityError);
+    throw new APIError(
+      'No internet connection detected. Please check your network connection and try again.',
+      0,
+      'network'
+    );
+  }
+
   // Add timeout to prevent hanging
   const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    console.log('Request timeout after 5 minutes');
+    controller.abort();
+  }
+  )
   const timeoutId = setTimeout(() => {
     console.log('Request timeout after 5 minutes');
     controller.abort();
@@ -89,6 +111,15 @@ export const transcribeAudio = async (file: File, apiKey: string): Promise<Trans
     fileName: processedFile.name
   });
   
+  // Log request details for debugging
+  console.log('Request details:', {
+    url: 'https://api.openai.com/v1/audio/transcriptions',
+    method: 'POST',
+    hasAuthHeader: !!apiKey,
+    fileSize: processedFile.size,
+    fileName: processedFile.name
+  });
+  
   try {
     const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
@@ -102,6 +133,7 @@ export const transcribeAudio = async (file: File, apiKey: string): Promise<Trans
     clearTimeout(timeoutId);
     console.log('OpenAI API response status:', response.status);
     console.log('OpenAI API response headers:', Object.fromEntries(response.headers.entries()));
+    console.log('OpenAI API response headers:', Object.fromEntries(response.headers.entries()));
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -109,6 +141,22 @@ export const transcribeAudio = async (file: File, apiKey: string): Promise<Trans
       const errorMessage = errorData.error?.message || `OpenAI API error: ${response.status}`;
       
       // Handle specific OpenAI error types
+      if (response.status === 0) {
+        throw new APIError(
+          'Unable to reach OpenAI servers. This could be due to network issues, firewall restrictions, or OpenAI service outage.',
+          response.status,
+          'openai'
+        );
+      }
+      
+      if (response.status === 401) {
+        throw new APIError(
+          'Invalid OpenAI API key. Please check your API key in Settings and ensure it has sufficient permissions.',
+          response.status,
+          'openai'
+        );
+      }
+      
       if (response.status === 0) {
         throw new APIError(
           'Unable to reach OpenAI servers. This could be due to network issues, firewall restrictions, or OpenAI service outage.',
@@ -141,9 +189,25 @@ export const transcribeAudio = async (file: File, apiKey: string): Promise<Trans
         );
       }
       
+      if (response.status >= 500) {
+        throw new APIError(
+          'OpenAI service is temporarily unavailable. Please try again in a few minutes.',
+          response.status,
+          'openai'
+        );
+      }
+      
       if (response.status === 413) {
         throw new APIError(
           `File too large for OpenAI API. Maximum size is 25MB. Your file: ${AudioProcessor.formatFileSize(processedFile.size)}`,
+          response.status,
+          'openai'
+        );
+      }
+      
+      if (response.status === 415) {
+        throw new APIError(
+          'Unsupported audio format. Please use MP3, WAV, M4A, or other supported formats.',
           response.status,
           'openai'
         );
@@ -173,6 +237,12 @@ export const transcribeAudio = async (file: File, apiKey: string): Promise<Trans
     return formatWhisperResponse(data, file, processedFile !== file);
   } catch (error) {
     console.error('Error in transcribeAudio:', error);
+    console.error('Error details:', {
+      name: error instanceof Error ? error.name : 'Unknown',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : 'No stack'
+    });
+    
     console.error('Error details:', {
       name: error instanceof Error ? error.name : 'Unknown',
       message: error instanceof Error ? error.message : 'Unknown error',
@@ -510,12 +580,23 @@ ${transcriptText}`;
     if (error instanceof APIError) {
       throw error;
     }
-    if (error instanceof TypeError && error.message.includes('fetch')) {
-      throw new APIError('Network error: Unable to connect to OpenAI API for summary generation', undefined, 'openai');
+    
+    // Handle different types of network errors
+    if (error instanceof TypeError) {
+      if (error.message.includes('fetch') || error.message.includes('network')) {
+        throw new APIError('Network error: Unable to connect to OpenAI API. Please check your internet connection and try again.', undefined, 'openai');
+      }
     }
+    
+    if (error.name === 'AbortError') {
+      throw new APIError('Request timed out after 5 minutes. Please try with a smaller file or check your connection.', undefined, 'openai');
+    }
+    
     throw new APIError(`Failed to generate summary: ${error instanceof Error ? error.message : 'Unknown error'}`, undefined, 'openai');
   }
+  finally {
     clearTimeout(timeoutId);
+  }
 };
 
 // Utility functions
