@@ -122,6 +122,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
         
         // Create audio URL for playback
         const url = URL.createObjectURL(blob);
+        addDebugInfo(`Created audio URL for playback: ${url.substring(0, 50)}...`);
         setAudioUrl(url);
         
         // Stop all tracks to release microphone
@@ -195,13 +196,25 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
 
   const playRecording = () => {
     if (audioUrl && audioRef.current) {
+      addDebugInfo(`Attempting to play audio: ${audioUrl ? 'URL exists' : 'No URL'}`);
       if (isPlaying) {
+        addDebugInfo('Pausing audio playback');
         audioRef.current.pause();
         setIsPlaying(false);
       } else {
-        audioRef.current.play();
-        setIsPlaying(true);
+        addDebugInfo('Starting audio playback');
+        audioRef.current.play()
+          .then(() => {
+            addDebugInfo('Audio playback started successfully');
+            setIsPlaying(true);
+          })
+          .catch((error) => {
+            addDebugInfo(`Audio playback failed: ${error.message}`);
+            setIsPlaying(false);
+          });
       }
+    } else {
+      addDebugInfo(`Cannot play: audioUrl=${!!audioUrl}, audioRef=${!!audioRef.current}`);
     }
   };
 
@@ -397,7 +410,11 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
               <audio
                 ref={audioRef}
                 src={audioUrl || undefined}
+                preload="auto"
+                controls={false}
                 onEnded={() => setIsPlaying(false)}
+                onLoadedData={() => addDebugInfo('Audio loaded and ready to play')}
+                onError={(e) => addDebugInfo(`Audio error: ${e.currentTarget.error?.message || 'Unknown error'}`)}
                 className="hidden"
               />
               
@@ -405,6 +422,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
               <div className="flex items-center justify-center space-x-3 mb-4">
                 <button
                   onClick={playRecording}
+                  disabled={!audioUrl}
                   className="flex items-center px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm"
                 >
                   {isPlaying ? <Pause className="w-4 h-4 mr-2" /> : <Play className="w-4 h-4 mr-2" />}
