@@ -31,61 +31,118 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
 
   const startRecording = async () => {
     try {
-      // Request microphone permission explicitly
-      const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
-      if (permissionStatus.state === 'denied') {
-        alert('Microphone access is denied. Please enable microphone permissions in your browser settings.');
+      console.log('Requesting microphone access...');
+      
+      // First, try to get available audio input devices
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const audioInputs = devices.filter(device => device.kind === 'audioinput');
+      console.log('Available audio input devices:', audioInputs);
+      
+      if (audioInputs.length === 0) {
+        alert('No microphone devices found. Please connect a microphone and refresh the page.');
         return;
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          // Ensure we're getting microphone input, not system audio
-          autoGainControl: true,
-          echoCancellation: true,
-          noiseSuppression: true,
-          sampleRate: 44100,
-          channelCount: 1, // Mono recording for better compatibility
-          // Explicitly request microphone (not system audio)
-          deviceId: 'default'
-        } 
+      // Try different audio constraint configurations
+      let stream = null;
+      const constraintOptions = [
+        // Option 1: Simple constraints
+        { audio: true },
+        // Option 2: Basic constraints with echo cancellation
+        { 
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          } 
+        },
+        // Option 3: Specific device constraints
+        { 
+          audio: {
+            deviceId: audioInputs[0].deviceId,
+            echoCancellation: true,
+            noiseSuppression: true
+          } 
+        }
+      ];
+
+      for (let i = 0; i < constraintOptions.length; i++) {
+        try {
+          console.log(`Trying audio constraints option ${i + 1}:`, constraintOptions[i]);
+          stream = await navigator.mediaDevices.getUserMedia(constraintOptions[i]);
+          console.log('Successfully got microphone stream with option', i + 1);
+          break;
+        } catch (err) {
+          console.log(`Option ${i + 1} failed:`, err);
+          if (i === constraintOptions.length - 1) {
+            throw err; // Re-throw the last error if all options fail
+          }
+        }
+      }
+
+      if (!stream) {
+        throw new Error('Failed to get microphone stream with all constraint options');
+      }
+
+      // Verify we got an audio track
+      const audioTracks = stream.getAudioTracks();
+      if (audioTracks.length === 0) {
+        throw new Error('No audio tracks found in the stream');
+      }
+
+      console.log('Audio track info:', {
+        label: audioTracks[0].label,
+        kind: audioTracks[0].kind,
+        enabled: audioTracks[0].enabled,
+        muted: audioTracks[0].muted,
+        readyState: audioTracks[0].readyState
       });
       
-      // Check for supported MIME types and use the best available
-      let mimeType = 'audio/webm;codecs=opus';
+      // Test if the microphone is actually working
+      if (audioTracks[0].muted || audioTracks[0].readyState !== 'live') {
+        console.warn('Microphone track appears to be muted or not live');
+      }
       
-      // Try different MIME types in order of preference for MP3 compatibility
+      // Find the best supported MIME type
       const supportedTypes = [
         'audio/webm;codecs=opus',
         'audio/webm',
-        'audio/mp4',
-        'audio/ogg;codecs=opus',
-        'audio/wav'
+        'audio/ogg',
+        'audio/mp4'
       ];
       
+      let mimeType = 'audio/webm'; // fallback
       for (const type of supportedTypes) {
         if (MediaRecorder.isTypeSupported(type)) {
           mimeType = type;
+          console.log('Using MIME type:', mimeType);
           break;
         }
       }
       
-      console.log('Using MIME type:', mimeType);
-      
-      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      // Test MediaRecorder creation before starting
+      let mediaRecorder;
+      try {
+        mediaRecorder = new MediaRecorder(stream, { mimeType });
+      } catch (err) {
+        console.log('Failed to create MediaRecorder with', mimeType, 'trying without mimeType');
+        mediaRecorder = new MediaRecorder(stream); // Let browser choose
+      }
       
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
       
       mediaRecorder.ondataavailable = (event) => {
+        console.log('Data available, size:', event.data.size);
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
         }
       };
       
       mediaRecorder.onstop = () => {
-        // Create blob with the recorded MIME type but label as MP3 for download
-        const blob = new Blob(audioChunksRef.current, { type: mimeType });
+        console.log('Recording stopped, chunks:', audioChunksRef.current.length);
+        const blob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType || mimeType });
+        console.log('Created blob, size:', blob.size, 'type:', blob.type);
         setAudioBlob(blob);
         
         // Create audio URL for playback
@@ -94,6 +151,10 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
         
         // Stop all tracks to release microphone
         stream.getTracks().forEach(track => track.stop());
+      };
+      
+      mediaRecorder.onerror = (event) => {
+        console.error('MediaRecorder error:', event);
       };
       
       // Start recording with smaller chunks for better real-time feedback
@@ -107,6 +168,8 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
         setRecordingTime(prev => prev + 1);
       }, 1000);
       
+      console.log('Recording started successfully');
+      
     } catch (error) {
       console.error('Error accessing microphone:', error);
       
@@ -118,7 +181,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
       } else if (error.name === 'NotReadableError') {
         alert('Microphone is being used by another application. Please close other apps using the microphone.');
       } else {
-        alert(`Unable to access microphone: ${error.message}. Please check your browser permissions and microphone connection.`);
+        alert(`Unable to access microphone: ${error.message || error}. Please check your browser permissions and try refreshing the page.`);
       }
     }
   };
