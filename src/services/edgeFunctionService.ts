@@ -1,7 +1,7 @@
 // Edge Function Service for real API calls through Supabase
 import { TranscriptData, SummaryData } from '../types';
 import { StandardError } from '../types';
-import { AudioProcessor } from '../utils/audioUtils';
+import { streamFileUpload, validateFileStream, StreamError } from '../utils/streamUtils';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -35,6 +35,14 @@ export const transcribeAudioViaEdgeFunction = async (
 ): Promise<TranscriptData> => {
   console.log('transcribeAudioViaEdgeFunction called with file:', file.name, 'size:', file.size);
   
+  // Validate file without loading into memory
+  const validation = await validateFileStream(file);
+  if (!validation.isValid) {
+    throw new EdgeFunctionError(validation.error || 'File validation failed');
+  }
+  
+  console.log('File validation passed:', validation.fileInfo);
+  
   if (!SUPABASE_URL) {
     throw new EdgeFunctionError('Supabase URL not configured. Please click "Connect to Supabase" in the top right to set up your Supabase connection.');
   }
@@ -50,96 +58,94 @@ export const transcribeAudioViaEdgeFunction = async (
   // Log file size for processing
   console.log(`Processing file: ${file.name} (${Math.round(file.size / 1024 / 1024)}MB)`);
   
-  // Initialize progress
-  onProgress?.('upload', 0, 'Preparing upload...', { totalBytes: file.size });
-  
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('apiKey', apiKey);
-
   const apiUrl = `${SUPABASE_URL}/functions/v1/transcribe-audio`;
   
   console.log('Sending request to edge function:', apiUrl);
-  console.log('Request details:', {
-    method: 'POST',
-    hasFile: !!file,
-    fileName: file.name,
-    fileSize: file.size,
-    hasApiKey: !!apiKey
-  });
-
-  // Create XMLHttpRequest for upload progress tracking
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    
-    // Track upload progress
-    xhr.upload.addEventListener('progress', (event) => {
-      if (event.lengthComputable) {
-        const percentage = Math.round((event.loaded / event.total) * 100);
-        onProgress?.('upload', percentage, 'Uploading audio file...', {
-          bytesUploaded: event.loaded,
-          totalBytes: event.total
-        });
-      }
-    });
-    
-    // Handle upload completion
-    xhr.upload.addEventListener('load', () => {
-      onProgress?.('processing', 0, 'Upload complete, processing on server...', { isIndeterminate: true });
-    });
-    
-    // Handle response
-    xhr.addEventListener('load', () => {
-      console.log('Edge function response status:', xhr.status);
+  
+  // Initialize progress
+  onProgress?.('upload', 0, 'Preparing streamed upload...', { totalBytes: file.size });
+  
+  // Use retry logic with exponential backoff
+  return retryWithBackoff(async () => {
+    try {
+      // Use streamed upload instead of loading entire file into memory
+      const response = await streamFileUpload(file, apiUrl, {
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'apiKey': apiKey
+        },
+        onProgress: (bytesUploaded, totalBytes) => {
+          const percentage = Math.round((bytesUploaded / totalBytes) * 100);
+          onProgress?.('upload', percentage, 'Streaming audio file...', {
+            bytesUploaded,
+            totalBytes
+          });
+        },
+        maxFileSize: 500 * 1024 * 1024, // 500MB limit
+        timeout: 600000 // 10 minutes
+      });
       
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          onProgress?.('transcription', 50, 'Transcribing audio with OpenAI Whisper...');
-          
-          const transcriptData = JSON.parse(xhr.responseText);
-          console.log('Transcription completed via edge function:', transcriptData);
-          
-          onProgress?.('transcription', 100, 'Transcription complete!');
-          resolve(transcriptData as TranscriptData);
-        } catch (parseError) {
-          console.error('Failed to parse transcription response:', parseError);
-          reject(new EdgeFunctionError('Failed to parse transcription response'));
-        }
-      } else {
-        try {
-          const errorData = JSON.parse(xhr.responseText);
-          console.error('Edge function error response:', errorData);
-          
-          if (xhr.status === 401) {
-            reject(new EdgeFunctionError('Invalid OpenAI API key. Please check your API key in Settings.', 401));
-          } else if (xhr.status === 413) {
-            reject(new EdgeFunctionError('File too large. Please try with a smaller audio file.', 413));
-          } else {
-            reject(new EdgeFunctionError(errorData.error || 'Edge function error occurred', xhr.status));
-          }
-        } catch (parseError) {
-          reject(new EdgeFunctionError(`HTTP ${xhr.status}: ${xhr.statusText}`, xhr.status));
+      // Upload complete, now processing
+      onProgress?.('processing', 0, 'Upload complete, processing on server...', { isIndeterminate: true });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('Edge function error response:', errorData);
+        
+        if (response.status === 401) {
+          throw new EdgeFunctionError('Invalid OpenAI API key. Please check your API key in Settings.', 401);
+        } else if (response.status === 413) {
+          throw new EdgeFunctionError('File too large. Please try with a smaller audio file.', 413);
+        } else {
+          // Create retryable error for 429/5xx
+          const error = new RetryableError(
+            errorData.error || 'Edge function error occurred',
+            response.status,
+            response.headers.get('Retry-After') ? parseInt(response.headers.get('Retry-After')!) * 1000 : undefined
+          );
+          throw error;
         }
       }
-    });
-    
-    // Handle network errors
-    xhr.addEventListener('error', () => {
-      console.error('Network error during transcription request');
-      reject(new EdgeFunctionError('Network error: Unable to connect to Supabase edge function. Please check your Supabase connection and try again.'));
-    });
-    
-    // Handle timeout
-    xhr.addEventListener('timeout', () => {
-      console.error('Request timeout during transcription');
-      reject(new EdgeFunctionError('Request timed out. Please try with a smaller file or check your connection.'));
-    });
-    
-    // Configure and send request
-    xhr.open('POST', apiUrl);
-    xhr.setRequestHeader('Authorization', `Bearer ${SUPABASE_ANON_KEY}`);
-    xhr.timeout = 600000; // 10 minute timeout
-    xhr.send(formData);
+      
+      onProgress?.('transcription', 50, 'Transcribing audio with OpenAI Whisper...');
+      
+      const transcriptData = await response.json();
+      console.log('Transcription completed via edge function:', transcriptData);
+      
+      onProgress?.('transcription', 100, 'Transcription complete!');
+      return transcriptData as TranscriptData;
+      
+    } catch (error) {
+      if (error instanceof StreamError) {
+        if (error.code === 'FILE_TOO_LARGE') {
+          throw new EdgeFunctionError(error.message, 413);
+        } else if (error.code === 'NETWORK_ERROR') {
+          throw new RetryableError('Network error during upload', undefined);
+        } else if (error.code === 'TIMEOUT') {
+          throw new RetryableError('Upload timeout', undefined);
+        }
+        throw new EdgeFunctionError(error.message);
+      }
+      throw error;
+    }
+  }, {
+    maxRetries: 3,
+    baseDelay: 1000,
+    maxDelay: 30000,
+    retryableStatusCodes: [429, 500, 502, 503, 504],
+    onRetry: (attempt, delay, error) => {
+      console.log(`Transcription retry attempt ${attempt}, waiting ${delay}ms:`, error.message);
+      onProgress?.('upload', 0, `Retry attempt ${attempt}/4`, { 
+        isIndeterminate: true,
+        retryAttempt: attempt
+      });
+    },
+    onCountdown: (remainingSeconds) => {
+      onProgress?.('upload', 0, `Retrying in ${remainingSeconds} seconds...`, { 
+        isIndeterminate: true,
+        retryCountdown: remainingSeconds
+      });
+    }
   });
   
   /* Original fetch-based implementation - keeping as fallback

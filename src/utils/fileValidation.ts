@@ -77,8 +77,9 @@ const AUDIO_SIGNATURES: Array<{ signature: number[]; mimeType: string; offset: n
  */
 const detectMimeTypeFromContent = async (file: File): Promise<string | null> => {
   try {
-    // Read first 64 bytes for signature detection
-    const buffer = await file.slice(0, 64).arrayBuffer();
+    // Read first 64 bytes for signature detection (streaming approach)
+    const headerSlice = file.slice(0, 64);
+    const buffer = await headerSlice.arrayBuffer();
     const bytes = new Uint8Array(buffer);
     
     // Check against known audio signatures
