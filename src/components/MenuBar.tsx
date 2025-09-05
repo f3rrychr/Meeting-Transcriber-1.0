@@ -79,7 +79,9 @@ const MenuBar: React.FC<MenuBarProps> = ({ onOpenSettings, onShowAbout, onShowEx
       label: 'Dashboard',
       items: [
         { label: 'Transcription Records', action: () => handleMenuItemClick(onShowTranscriptionHistory) },
-        { label: 'Action Tracker', action: () => handleMenuItemClick(onShowActionTracker) }
+        { label: 'Action Tracker', action: () => handleMenuItemClick(onShowActionTracker) },
+        { type: 'separator' },
+        { label: 'Storage Management', action: () => handleMenuItemClick(onShowTranscriptionHistory) }
       ]
     },
     {
