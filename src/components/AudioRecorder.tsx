@@ -431,15 +431,11 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
                   {isPlaying ? 'Pause' : 'Play'}
                 </button>
                 <button
-                  onClick={() => {
-                    if (audioRef.current) {
-                      audioRef.current.volume = 1.0;
-                      addDebugInfo(`Volume manually set to: ${audioRef.current.volume}`);
-                    }
-                  }}
-                  className="flex items-center px-3 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors text-sm"
+                  onClick={downloadRecording}
+                  className="flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
                 >
-                  🔊 Max Volume
+                  <Download className="w-4 h-4 mr-2" />
+                  Save
                 </button>
                 <button
                   onClick={() => {
