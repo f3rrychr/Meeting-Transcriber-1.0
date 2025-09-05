@@ -219,10 +219,11 @@ function App() {
       setProcessingState('error');
       
       if (error instanceof APIError || error instanceof EdgeFunctionError) {
-        setProcessingError(`API Error: ${error.message}`);
+        const standardError = error instanceof APIError ? error.toStandardError() : error.toStandardError();
+        setProcessingError(`${standardError.apiType?.toUpperCase() || 'API'} Error: ${standardError.error}`);
         
         // If it's an API key error or missing connection, open settings
-        if (error.statusCode === 401 || error.message.includes('API key') || error.message.includes('Supabase connection')) {
+        if (standardError.statusCode === 401 || standardError.error.includes('API key') || standardError.error.includes('Supabase connection')) {
           setShowSettings(true);
         }
       } else {

@@ -16,7 +16,11 @@ Deno.serve(async (req: Request) => {
   try {
     if (req.method !== "POST") {
       return new Response(
-        JSON.stringify({ error: "Method not allowed" }),
+        JSON.stringify({ 
+          error: "Method not allowed",
+          statusCode: 405,
+          apiType: "supabase"
+        }),
         {
           status: 405,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -34,7 +38,11 @@ Deno.serve(async (req: Request) => {
 
     if (!transcript) {
       return new Response(
-        JSON.stringify({ error: "No transcript data provided" }),
+        JSON.stringify({ 
+          error: "No transcript data provided",
+          statusCode: 400,
+          apiType: "supabase"
+        }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -44,7 +52,11 @@ Deno.serve(async (req: Request) => {
 
     if (!apiKey || !apiKey.startsWith("sk-")) {
       return new Response(
-        JSON.stringify({ error: "Invalid OpenAI API key. Key should start with 'sk-'" }),
+        JSON.stringify({ 
+          error: "Invalid OpenAI API key. Key should start with 'sk-'",
+          statusCode: 401,
+          apiType: "openai"
+        }),
         {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -61,7 +73,11 @@ Deno.serve(async (req: Request) => {
 
     if (transcriptText.length === 0) {
       return new Response(
-        JSON.stringify({ error: "Empty transcript - cannot generate summary" }),
+        JSON.stringify({ 
+          error: "Empty transcript - cannot generate summary",
+          statusCode: 400,
+          apiType: "supabase"
+        }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -139,8 +155,10 @@ ${transcriptText}`;
       
       return new Response(
         JSON.stringify({ 
-          error: errorData.error?.message || `OpenAI API error: ${openaiResponse.status}`,
-          statusCode: openaiResponse.status 
+          error: errorData.error?.message || "OpenAI API error occurred",
+          statusCode: openaiResponse.status,
+          apiType: "openai",
+          details: errorData.error?.type || undefined
         }),
         {
           status: openaiResponse.status,
@@ -154,7 +172,11 @@ ${transcriptText}`;
 
     if (!summaryText) {
       return new Response(
-        JSON.stringify({ error: "No summary generated from OpenAI API" }),
+        JSON.stringify({ 
+          error: "No summary generated from OpenAI API",
+          statusCode: 500,
+          apiType: "openai"
+        }),
         {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -219,7 +241,9 @@ ${transcriptText}`;
     
     return new Response(
       JSON.stringify({ 
-        error: `Server error: ${error instanceof Error ? error.message : 'Unknown error'}` 
+        error: error instanceof Error ? error.message : 'Unknown server error',
+        statusCode: 500,
+        apiType: "supabase"
       }),
       {
         status: 500,

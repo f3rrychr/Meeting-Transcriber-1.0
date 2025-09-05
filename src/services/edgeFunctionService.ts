@@ -1,5 +1,6 @@
 // Edge Function Service for real API calls through Supabase
 import { TranscriptData, SummaryData } from '../types';
+import { StandardError } from '../types';
 import { AudioProcessor } from '../utils/audioUtils';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -9,6 +10,14 @@ export class EdgeFunctionError extends Error {
   constructor(message: string, public statusCode?: number) {
     super(message);
     this.name = 'EdgeFunctionError';
+  }
+
+  toStandardError(): StandardError {
+    return {
+      error: this.message,
+      statusCode: this.statusCode,
+      apiType: 'supabase',
+    };
   }
 }
 
@@ -58,19 +67,19 @@ export const transcribeAudioViaEdgeFunction = async (file: File, apiKey: string)
     console.log('Edge function response headers:', Object.fromEntries(response.headers.entries()));
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
       console.error('Edge function error response:', errorData);
       
       if (response.status === 401) {
-        throw new EdgeFunctionError('Invalid OpenAI API key. Please check your API key in Settings.');
+        throw new EdgeFunctionError('Invalid OpenAI API key. Please check your API key in Settings.', 401);
       }
       
       if (response.status === 413) {
-        throw new EdgeFunctionError('File too large. Please try with a smaller audio file.');
+        throw new EdgeFunctionError('File too large. Please try with a smaller audio file.', 413);
       }
       
       throw new EdgeFunctionError(
-        errorData.error || `Edge function error: ${response.status}`,
+        errorData.error || 'Edge function error occurred',
         response.status
       );
     }
@@ -133,15 +142,15 @@ export const generateSummaryViaEdgeFunction = async (transcript: TranscriptData,
     console.log('Summary edge function response status:', response.status);
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
       console.error('Summary edge function error:', errorData);
       
       if (response.status === 401) {
-        throw new EdgeFunctionError('Invalid OpenAI API key. Please check your API key in Settings.');
+        throw new EdgeFunctionError('Invalid OpenAI API key. Please check your API key in Settings.', 401);
       }
       
       throw new EdgeFunctionError(
-        errorData.error || `Summary generation error: ${response.status}`,
+        errorData.error || 'Summary generation error occurred',
         response.status
       );
     }

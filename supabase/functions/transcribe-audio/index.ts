@@ -16,7 +16,11 @@ Deno.serve(async (req: Request) => {
   try {
     if (req.method !== "POST") {
       return new Response(
-        JSON.stringify({ error: "Method not allowed" }),
+        JSON.stringify({ 
+          error: "Method not allowed",
+          statusCode: 405,
+          apiType: "supabase"
+        }),
         {
           status: 405,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -39,7 +43,11 @@ Deno.serve(async (req: Request) => {
 
     if (!audioFile) {
       return new Response(
-        JSON.stringify({ error: "No audio file provided" }),
+        JSON.stringify({ 
+          error: "No audio file provided",
+          statusCode: 400,
+          apiType: "supabase"
+        }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -49,7 +57,11 @@ Deno.serve(async (req: Request) => {
 
     if (!apiKey || !apiKey.startsWith("sk-")) {
       return new Response(
-        JSON.stringify({ error: "Invalid OpenAI API key. Key should start with 'sk-'" }),
+        JSON.stringify({ 
+          error: "Invalid OpenAI API key. Key should start with 'sk-'",
+          statusCode: 401,
+          apiType: "openai"
+        }),
         {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -103,8 +115,10 @@ Deno.serve(async (req: Request) => {
       
       return new Response(
         JSON.stringify({ 
-          error: errorData.error?.message || `OpenAI API error: ${openaiResponse.status}`,
-          statusCode: openaiResponse.status 
+          error: errorData.error?.message || "OpenAI API error occurred",
+          statusCode: openaiResponse.status,
+          apiType: "openai",
+          details: errorData.error?.type || undefined
         }),
         {
           status: openaiResponse.status,
@@ -170,7 +184,9 @@ Deno.serve(async (req: Request) => {
     
     return new Response(
       JSON.stringify({ 
-        error: `Server error: ${error instanceof Error ? error.message : 'Unknown error'}` 
+        error: error instanceof Error ? error.message : 'Unknown server error',
+        statusCode: 500,
+        apiType: "supabase"
       }),
       {
         status: 500,

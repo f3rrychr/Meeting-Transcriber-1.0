@@ -459,7 +459,7 @@ ${transcriptText}`;
     }
     
     if (error.name === 'AbortError') {
-      throw new APIError('Request timed out after 5 minutes. Please try with a smaller file or check your connection.', undefined, 'openai');
+      throw new APIError('Request timed out. Please try with a smaller file or check your connection.', undefined, 'openai');
     }
     
     throw new APIError(`Failed to generate summary: ${error instanceof Error ? error.message : 'Unknown error'}`, undefined, 'openai');

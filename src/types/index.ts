@@ -75,3 +75,10 @@ export interface TranscriptionRecord {
   fileName: string;
   createdAt: number;
 }
+
+export interface StandardError {
+  error: string;
+  statusCode?: number;
+  apiType?: 'openai' | 'huggingface' | 'supabase';
+  details?: string;
+}
