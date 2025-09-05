@@ -16,6 +16,9 @@ const AudioUpload: React.FC<AudioUploadProps> = ({ onFileUpload }) => {
   } | null>(null);
   const [activeTab, setActiveTab] = useState<'record' | 'upload'>('record');
 
+  const supportedFormats = getSupportedFormats();
+  const fileAcceptString = getFileAcceptString();
+
   const handleFile = async (file: File) => {
     setError(null);
     setValidationDetails(null);
@@ -70,8 +73,6 @@ const AudioUpload: React.FC<AudioUploadProps> = ({ onFileUpload }) => {
 
   return (
     <div className="max-w-4xl w-full mx-auto px-4 sm:px-0">
-  const supportedFormats = getSupportedFormats();
-  const fileAcceptString = getFileAcceptString();
 
       {/* Content based on active tab */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
