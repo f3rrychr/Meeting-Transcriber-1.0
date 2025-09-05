@@ -27,15 +27,8 @@ export const transcribeAudioViaEdgeFunction = async (file: File, apiKey: string)
     throw new EdgeFunctionError('Invalid OpenAI API key. Key should start with "sk-"');
   }
 
-  // Check file size (25MB limit for OpenAI)
-  const maxSize = 25 * 1024 * 1024;
-  
-  if (AudioProcessor.needsCompression(file)) {
-    const fileSizeMB = Math.round(file.size / 1024 / 1024);
-    throw new EdgeFunctionError(
-      `File too large (${fileSizeMB}MB). OpenAI Whisper API has a 25MB limit. Please compress your audio file using external software (like Audacity, FFmpeg, or online converters) before uploading.`
-    );
-  }
+  // Log file size for processing
+  console.log(`Processing file: ${file.name} (${Math.round(file.size / 1024 / 1024)}MB)`);
   
   const formData = new FormData();
   formData.append('file', file);

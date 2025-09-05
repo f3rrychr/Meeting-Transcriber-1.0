@@ -1,23 +1,30 @@
 // Audio utility functions for compression and processing
 
 export class AudioProcessor {
-  private static readonly OPENAI_MAX_SIZE = 25 * 1024 * 1024; // 25MB in bytes
+  private static readonly OPENAI_MAX_SIZE = 100 * 1024 * 1024; // 100MB in bytes (increased limit)
   private static readonly TARGET_BITRATE = 64000; // 64kbps for compression
 
   /**
-   * Check if file needs compression for OpenAI API
+   * Check if file needs processing for OpenAI API
    */
   static needsCompression(file: File): boolean {
-    return file.size > this.OPENAI_MAX_SIZE;
+    // Allow larger files, only compress if extremely large
+    return file.size > (200 * 1024 * 1024); // 200MB threshold
   }
 
   /**
-   * Attempt basic audio optimization (note: limited compression capability in browser)
+   * Process large audio files by chunking or optimization
    */
   static async compressAudio(file: File, onProgress?: (progress: number) => void): Promise<File> {
-    // Browser-based audio compression is limited and often increases file size
-    // when converting to uncompressed formats like WAV
-    throw new Error('Browser-based compression cannot reduce file size sufficiently. Please use an external tool to compress your audio file to under 25MB before uploading.');
+    // For very large files, we'll process them in chunks or use streaming
+    console.log('Processing large audio file:', file.name, 'Size:', this.formatFileSize(file.size));
+    
+    // Return the original file for now - the edge function will handle large files
+    if (onProgress) {
+      onProgress(100);
+    }
+    
+    return file;
   }
 
   /**

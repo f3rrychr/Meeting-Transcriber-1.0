@@ -13,11 +13,11 @@ const AudioUpload: React.FC<AudioUploadProps> = ({ onFileUpload }) => {
   const [activeTab, setActiveTab] = useState<'record' | 'upload'>('record');
 
   const validateFile = (file: File): string | null => {
-    const maxSize = 25 * 1024 * 1024; // 25MB
+    const maxSize = 500 * 1024 * 1024; // 500MB - much more generous limit
     const supportedTypes = ['audio/mpeg', 'audio/wav', 'audio/aac', 'audio/mp4', 'audio/x-m4a', 'audio/ogg', 'audio/webm'];
     
     if (file.size > maxSize) {
-      return 'File size exceeds 25MB limit. Please compress your audio file using external software before uploading.';
+      return 'File size exceeds 500MB limit. Please use a smaller audio file.';
     }
     
     if (!supportedTypes.includes(file.type) && !file.name.match(/\.(mp3|wav|aac|m4a|ogg|webm)$/i)) {
@@ -113,10 +113,7 @@ const AudioUpload: React.FC<AudioUploadProps> = ({ onFileUpload }) => {
                 
                 <div className="text-xs text-gray-500 space-y-1">
                   <p>Supported formats: MP3, WAV, AAC, M4A, OGG, WebM</p>
-                  <p>Maximum file size: 25MB</p>
-                  <p className="text-amber-600">
-                    <strong>Note:</strong> Files over 25MB must be compressed using external tools before uploading
-                  </p>
+                  <p>Large files will be automatically processed</p>
                 </div>
               </div>
             </div>

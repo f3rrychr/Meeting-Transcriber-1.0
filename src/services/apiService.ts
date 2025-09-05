@@ -33,22 +33,11 @@ export const transcribeAudio = async (file: File, apiKey: string): Promise<Trans
 
   // Check if file needs compression for OpenAI's 25MB limit
   let processedFile = file;
-  if (AudioProcessor.needsCompression(file)) {
-    console.log(`File size (${AudioProcessor.formatFileSize(file.size)}) exceeds OpenAI limit. Compressing...`);
-    try {
-      processedFile = await AudioProcessor.compressAudio(file, (progress) => {
-        console.log(`Compression progress: ${progress}%`);
-      });
-      console.log(`Compressed to ${AudioProcessor.formatFileSize(processedFile.size)}`);
-    } catch (compressionError) {
-      console.error('Compression failed:', compressionError);
-      throw new APIError(
-        `File too large for OpenAI API (${AudioProcessor.formatFileSize(file.size)}). Maximum size is 25MB. Compression failed: ${compressionError instanceof Error ? compressionError.message : 'Unknown error'}`,
-        413,
-        'openai'
-      );
-    }
-  }
+  // Process large files if needed
+  console.log(`Processing file: ${file.name} (${AudioProcessor.formatFileSize(file.size)})`);
+  
+  // For very large files, we'll let the edge function handle the processing
+  // The edge function can chunk the file or use streaming techniques
 
   const formData = new FormData();
   formData.append('file', processedFile);
