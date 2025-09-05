@@ -107,9 +107,10 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
       // List of preferred MIME types in order of preference
       const preferredMimeTypes = [
         'audio/mpeg',           // MP3
-        'audio/mp4',            // M4A/AAC
+        'audio/wav',            // WAV (uncompressed, widely supported)
         'audio/webm;codecs=opus', // WebM with Opus
         'audio/webm',           // WebM default
+        'audio/mp4',            // M4A/AAC (moved to lower priority)
         'audio/ogg;codecs=opus' // OGG with Opus
       ];
       
@@ -264,6 +265,8 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
       let extension = 'webm'; // default fallback
       if (audioBlob.type.includes('mpeg')) {
         extension = 'mp3';
+      } else if (audioBlob.type.includes('wav')) {
+        extension = 'wav';
       } else if (audioBlob.type.includes('mp4')) {
         extension = 'm4a';
       } else if (audioBlob.type.includes('ogg')) {
@@ -298,6 +301,8 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
       let extension = 'webm'; // default fallback
       if (audioBlob.type.includes('mpeg')) {
         extension = 'mp3';
+      } else if (audioBlob.type.includes('wav')) {
+        extension = 'wav';
       } else if (audioBlob.type.includes('mp4')) {
         extension = 'm4a';
       } else if (audioBlob.type.includes('ogg')) {
