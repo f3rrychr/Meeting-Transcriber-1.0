@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, FileText, Download, Calendar, Hash, Trash2, ChevronDown } from 'lucide-react';
+import { X, FileText, Download, Calendar, Hash, Trash2, ChevronDown, AlertTriangle, HardDrive } from 'lucide-react';
 import { TranscriptionRecord } from '../types';
 import { TranscriptionStorage } from '../utils/storageUtils';
 import { exportTranscriptAsDocx, exportTranscriptAsPdf, exportSummaryAsDocx, exportSummaryAsPdf } from '../utils/exportUtils';
@@ -17,12 +17,20 @@ const TranscriptionHistoryModal: React.FC<TranscriptionHistoryModalProps> = ({
 }) => {
   const [transcriptionRecords, setTranscriptionRecords] = useState<TranscriptionRecord[]>([]);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const [storageStats, setStorageStats] = useState<any>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   useEffect(() => {
-    // Load transcription records from localStorage
-    const records = TranscriptionStorage.getTranscriptions();
-    setTranscriptionRecords(records);
+    loadData();
   }, []);
+
+  const loadData = () => {
+    // Load transcription records and storage stats
+    const records = TranscriptionStorage.getTranscriptions();
+    const stats = TranscriptionStorage.getStorageStats();
+    setTranscriptionRecords(records);
+    setStorageStats(stats);
+  };
 
   const handleDeleteRecord = (recordId: string) => {
     const record = transcriptionRecords.find(r => r.id === recordId);
@@ -33,6 +41,29 @@ const TranscriptionHistoryModal: React.FC<TranscriptionHistoryModalProps> = ({
       // Reload records after deletion
       const updatedRecords = TranscriptionStorage.getTranscriptions();
       setTranscriptionRecords(updatedRecords);
+      setStorageStats(TranscriptionStorage.getStorageStats());
+    }
+  };
+
+  const handleClearAllHistory = () => {
+    if (showClearConfirm) {
+      TranscriptionStorage.clearAllTranscriptions();
+      loadData();
+      setShowClearConfirm(false);
+    } else {
+      setShowClearConfirm(true);
+      // Auto-hide confirmation after 5 seconds
+      setTimeout(() => setShowClearConfirm(false), 5000);
+    }
+  };
+
+  const handlePruneOldRecords = () => {
+    const result = TranscriptionStorage.pruneOldRecords();
+    if (result.removed > 0) {
+      alert(`Pruned ${result.removed} old records, saved ${Math.round(result.sizeSaved / 1024)}KB of storage space.`);
+      loadData();
+    } else {
+      alert('No records needed to be pruned. Storage is within limits.');
     }
   };
 
@@ -155,6 +186,63 @@ const TranscriptionHistoryModal: React.FC<TranscriptionHistoryModalProps> = ({
         </div>
         
         <div className="p-6">
+          {/* Storage Statistics */}
+          {storageStats && (
+            <div className={`mb-6 p-4 rounded-lg border ${
+              storageStats.isNearLimit ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200'
+            }`}>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className={`font-medium flex items-center ${
+                  storageStats.isNearLimit ? 'text-amber-800' : 'text-blue-800'
+                }`}>
+                  <HardDrive className="w-4 h-4 mr-2" />
+                  Storage Usage
+                  {storageStats.isNearLimit && <AlertTriangle className="w-4 h-4 ml-2 text-amber-600" />}
+                </h3>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={handlePruneOldRecords}
+                    className="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                  >
+                    Optimize Storage
+                  </button>
+                  <button
+                    onClick={handleClearAllHistory}
+                    className={`px-3 py-1 text-xs rounded transition-colors ${
+                      showClearConfirm 
+                        ? 'bg-red-600 hover:bg-red-700 text-white' 
+                        : 'bg-gray-600 hover:bg-gray-700 text-white'
+                    }`}
+                  >
+                    {showClearConfirm ? 'Confirm Clear All' : 'Clear All History'}
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4 text-sm">
+                <div>
+                  <span className={storageStats.isNearLimit ? 'text-amber-700' : 'text-blue-700'}>
+                    Records: {storageStats.recordCount}/50
+                  </span>
+                </div>
+                <div>
+                  <span className={storageStats.isNearLimit ? 'text-amber-700' : 'text-blue-700'}>
+                    Size: {storageStats.sizeMB.toFixed(2)}/2.0 MB
+                  </span>
+                </div>
+                <div>
+                  <span className={storageStats.isNearLimit ? 'text-amber-700' : 'text-blue-700'}>
+                    Usage: {storageStats.percentUsed.toFixed(1)}%
+                  </span>
+                </div>
+              </div>
+              {storageStats.isNearLimit && (
+                <div className="mt-3 text-xs text-amber-700">
+                  ⚠️ Storage is near capacity. Consider clearing old records or optimizing storage.
+                </div>
+              )}
+            </div>
+          )}
+
           {transcriptionRecords.length > 0 ? (
             <div className="bg-white rounded-lg border border-gray-200 overflow-hidden min-h-[500px]">
               <div className="overflow-x-auto">

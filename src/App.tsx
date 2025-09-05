@@ -17,6 +17,7 @@ import { exportTranscriptAsDocx, exportSummaryAsDocx, exportTranscriptAsPdf, exp
 import { transcribeAudio, diarizeSpeakers, generateSummary, validateAPIKeys, APIError } from './services/apiService';
 import { transcribeAudioViaEdgeFunction, generateSummaryViaEdgeFunction, EdgeFunctionError, checkSupabaseConnection } from './services/edgeFunctionService';
 import { AudioProcessor } from './utils/audioUtils';
+import { TranscriptionStorage } from './utils/storageUtils';
 
 // Local storage keys
 const STORAGE_KEYS = {
@@ -46,6 +47,11 @@ const saveAPIKeys = (keys: { openai: string; huggingface: string }) => {
 };
 
 function App() {
+  // Initialize storage on app startup
+  React.useEffect(() => {
+    TranscriptionStorage.initialize();
+  }, []);
+
   const [processingState, setProcessingState] = useState<ProcessingState>('idle');
   const [progress, setProgress] = useState(0);
   const [currentFile, setCurrentFile] = useState<File | null>(null);
