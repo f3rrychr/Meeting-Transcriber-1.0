@@ -6,6 +6,13 @@ import { AudioProcessor } from '../utils/audioUtils';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+export interface ProgressCallback {
+  (phase: 'upload' | 'processing' | 'transcription' | 'summary', 
+   percentage: number, 
+   message: string, 
+   details?: { bytesUploaded?: number; totalBytes?: number; chunksReceived?: number; totalChunks?: number }): void;
+}
+
 export class EdgeFunctionError extends Error {
   constructor(message: string, public statusCode?: number) {
     super(message);
@@ -21,7 +28,11 @@ export class EdgeFunctionError extends Error {
   }
 }
 
-export const transcribeAudioViaEdgeFunction = async (file: File, apiKey: string): Promise<TranscriptData> => {
+export const transcribeAudioViaEdgeFunction = async (
+  file: File, 
+  apiKey: string, 
+  onProgress?: ProgressCallback
+): Promise<TranscriptData> => {
   console.log('transcribeAudioViaEdgeFunction called with file:', file.name, 'size:', file.size);
   
   if (!SUPABASE_URL) {
@@ -39,6 +50,9 @@ export const transcribeAudioViaEdgeFunction = async (file: File, apiKey: string)
   // Log file size for processing
   console.log(`Processing file: ${file.name} (${Math.round(file.size / 1024 / 1024)}MB)`);
   
+  // Initialize progress
+  onProgress?.('upload', 0, 'Preparing upload...', { totalBytes: file.size });
+  
   const formData = new FormData();
   formData.append('file', file);
   formData.append('apiKey', apiKey);
@@ -54,6 +68,81 @@ export const transcribeAudioViaEdgeFunction = async (file: File, apiKey: string)
     hasApiKey: !!apiKey
   });
 
+  // Create XMLHttpRequest for upload progress tracking
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    
+    // Track upload progress
+    xhr.upload.addEventListener('progress', (event) => {
+      if (event.lengthComputable) {
+        const percentage = Math.round((event.loaded / event.total) * 100);
+        onProgress?.('upload', percentage, 'Uploading audio file...', {
+          bytesUploaded: event.loaded,
+          totalBytes: event.total
+        });
+      }
+    });
+    
+    // Handle upload completion
+    xhr.upload.addEventListener('load', () => {
+      onProgress?.('processing', 0, 'Upload complete, processing on server...', { isIndeterminate: true });
+    });
+    
+    // Handle response
+    xhr.addEventListener('load', () => {
+      console.log('Edge function response status:', xhr.status);
+      
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          onProgress?.('transcription', 50, 'Transcribing audio with OpenAI Whisper...');
+          
+          const transcriptData = JSON.parse(xhr.responseText);
+          console.log('Transcription completed via edge function:', transcriptData);
+          
+          onProgress?.('transcription', 100, 'Transcription complete!');
+          resolve(transcriptData as TranscriptData);
+        } catch (parseError) {
+          console.error('Failed to parse transcription response:', parseError);
+          reject(new EdgeFunctionError('Failed to parse transcription response'));
+        }
+      } else {
+        try {
+          const errorData = JSON.parse(xhr.responseText);
+          console.error('Edge function error response:', errorData);
+          
+          if (xhr.status === 401) {
+            reject(new EdgeFunctionError('Invalid OpenAI API key. Please check your API key in Settings.', 401));
+          } else if (xhr.status === 413) {
+            reject(new EdgeFunctionError('File too large. Please try with a smaller audio file.', 413));
+          } else {
+            reject(new EdgeFunctionError(errorData.error || 'Edge function error occurred', xhr.status));
+          }
+        } catch (parseError) {
+          reject(new EdgeFunctionError(`HTTP ${xhr.status}: ${xhr.statusText}`, xhr.status));
+        }
+      }
+    });
+    
+    // Handle network errors
+    xhr.addEventListener('error', () => {
+      console.error('Network error during transcription request');
+      reject(new EdgeFunctionError('Network error: Unable to connect to Supabase edge function. Please check your Supabase connection and try again.'));
+    });
+    
+    // Handle timeout
+    xhr.addEventListener('timeout', () => {
+      console.error('Request timeout during transcription');
+      reject(new EdgeFunctionError('Request timed out. Please try with a smaller file or check your connection.'));
+    });
+    
+    // Configure and send request
+    xhr.open('POST', apiUrl);
+    xhr.setRequestHeader('Authorization', `Bearer ${SUPABASE_ANON_KEY}`);
+    xhr.timeout = 600000; // 10 minute timeout
+    xhr.send(formData);
+  });
+  
+  /* Original fetch-based implementation - keeping as fallback
   try {
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -103,7 +192,11 @@ export const transcribeAudioViaEdgeFunction = async (file: File, apiKey: string)
   }
 };
 
-export const generateSummaryViaEdgeFunction = async (transcript: TranscriptData, apiKey: string): Promise<SummaryData> => {
+export const generateSummaryViaEdgeFunction = async (
+  transcript: TranscriptData, 
+  apiKey: string, 
+  onProgress?: ProgressCallback
+): Promise<SummaryData> => {
   console.log('generateSummaryViaEdgeFunction called');
   
   if (!SUPABASE_URL) {
@@ -122,11 +215,15 @@ export const generateSummaryViaEdgeFunction = async (transcript: TranscriptData,
     throw new EdgeFunctionError('Invalid transcript data for summary generation');
   }
 
+  onProgress?.('summary', 0, 'Generating summary with GPT...');
+  
   const apiUrl = `${SUPABASE_URL}/functions/v1/generate-summary`;
   
   console.log('Sending summary request to edge function:', apiUrl);
 
   try {
+    onProgress?.('summary', 25, 'Sending transcript to AI...');
+    
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
@@ -140,6 +237,7 @@ export const generateSummaryViaEdgeFunction = async (transcript: TranscriptData,
     });
 
     console.log('Summary edge function response status:', response.status);
+    onProgress?.('summary', 75, 'Processing AI response...');
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
@@ -158,6 +256,7 @@ export const generateSummaryViaEdgeFunction = async (transcript: TranscriptData,
     const summaryData = await response.json();
     console.log('Summary completed via edge function:', summaryData);
     
+    onProgress?.('summary', 100, 'Summary generation complete!');
     return summaryData as SummaryData;
   } catch (error) {
     console.error('Error calling summary edge function:', error);

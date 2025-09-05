@@ -66,6 +66,17 @@ export interface ExportPreferences {
   includeMetadata: boolean;
 }
 
+export interface ProgressState {
+  phase: 'upload' | 'processing' | 'transcription' | 'summary' | 'complete';
+  percentage: number;
+  isIndeterminate: boolean;
+  message: string;
+  bytesUploaded?: number;
+  totalBytes?: number;
+  chunksReceived?: number;
+  totalChunks?: number;
+}
+
 export interface TranscriptionRecord {
   id: string;
   date: string;
