@@ -197,6 +197,11 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
   const playRecording = () => {
     if (audioUrl && audioRef.current) {
       addDebugInfo(`Attempting to play audio: ${audioUrl ? 'URL exists' : 'No URL'}`);
+      
+      // Ensure volume is set to maximum before playing
+      audioRef.current.volume = 1.0;
+      addDebugInfo(`Volume set to: ${audioRef.current.volume}`);
+      
       if (isPlaying) {
         addDebugInfo('Pausing audio playback');
         audioRef.current.pause();
@@ -206,6 +211,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
         audioRef.current.play()
           .then(() => {
             addDebugInfo('Audio playback started successfully');
+            addDebugInfo(`Current volume during playback: ${audioRef.current?.volume}`);
             setIsPlaying(true);
           })
           .catch((error) => {
@@ -412,7 +418,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
                 src={audioUrl || undefined}
                 preload="auto"
                 controls={true}
-                volume={1.0}
                 muted={false}
                 onEnded={() => setIsPlaying(false)}
                 onLoadedData={() => addDebugInfo('Audio loaded and ready to play')}
@@ -420,6 +425,12 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
                 onVolumeChange={(e) => addDebugInfo(`Volume changed to: ${e.currentTarget.volume}`)}
                 onPlay={() => addDebugInfo('Audio play event fired')}
                 onPause={() => addDebugInfo('Audio pause event fired')}
+                onLoadedMetadata={() => {
+                  if (audioRef.current) {
+                    audioRef.current.volume = 1.0;
+                    addDebugInfo('Volume set to 1.0 after metadata loaded');
+                  }
+                }}
                 className="w-full mb-3"
               />
               
@@ -436,8 +447,21 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
                 <button
                   onClick={() => {
                     if (audioRef.current) {
+                      audioRef.current.volume = 1.0;
+                      addDebugInfo(`Volume manually set to: ${audioRef.current.volume}`);
+                    }
+                  }}
+                  className="flex items-center px-3 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors text-sm"
+                >
+                  🔊 Max Volume
+                </button>
+                <button
+                  onClick={() => {
+                    if (audioRef.current) {
                       audioRef.current.currentTime = 0;
+                      audioRef.current.volume = 1.0;
                       addDebugInfo('Audio reset to beginning');
+                      addDebugInfo(`Volume reset to: ${audioRef.current.volume}`);
                     }
                   }}
                   className="flex items-center px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm"
