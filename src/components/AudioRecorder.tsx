@@ -100,8 +100,38 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
       
       addDebugInfo('Got microphone stream');
       
-      // Create MediaRecorder - let browser choose the best format
-      const mediaRecorder = new MediaRecorder(stream);
+      // Try to create MediaRecorder with MP3 format, fallback to browser default
+      let mediaRecorder;
+      let selectedMimeType = '';
+      
+      // List of preferred MIME types in order of preference
+      const preferredMimeTypes = [
+        'audio/mpeg',           // MP3
+        'audio/mp4',            // M4A/AAC
+        'audio/webm;codecs=opus', // WebM with Opus
+        'audio/webm',           // WebM default
+        'audio/ogg;codecs=opus' // OGG with Opus
+      ];
+      
+      // Find the first supported MIME type
+      for (const mimeType of preferredMimeTypes) {
+        if (MediaRecorder.isTypeSupported(mimeType)) {
+          selectedMimeType = mimeType;
+          addDebugInfo(`Using MIME type: ${mimeType}`);
+          break;
+        }
+      }
+      
+      // Create MediaRecorder with selected MIME type
+      if (selectedMimeType) {
+        mediaRecorder = new MediaRecorder(stream, { mimeType: selectedMimeType });
+      } else {
+        // Fallback to browser default
+        mediaRecorder = new MediaRecorder(stream);
+        selectedMimeType = mediaRecorder.mimeType;
+        addDebugInfo(`Fallback to browser default: ${selectedMimeType}`);
+      }
+      
       addDebugInfo(`MediaRecorder created with MIME: ${mediaRecorder.mimeType}`);
       
       mediaRecorderRef.current = mediaRecorder;
@@ -116,7 +146,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
       
       mediaRecorder.onstop = () => {
         addDebugInfo(`Recording stopped. Chunks: ${audioChunksRef.current.length}`);
-        const blob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType || 'audio/webm' });
+        const blob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType || selectedMimeType });
         addDebugInfo(`Created audio blob: ${blob.size} bytes`);
         setAudioBlob(blob);
         
@@ -229,11 +259,20 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
       const url = URL.createObjectURL(audioBlob);
       const a = document.createElement('a');
       a.href = url;
-      // Use appropriate extension based on MIME type
-      let extension = 'webm';
-      if (audioBlob.type.includes('mp4')) extension = 'm4a';
-      else if (audioBlob.type.includes('ogg')) extension = 'ogg';
-      else if (audioBlob.type.includes('wav')) extension = 'wav';
+      
+      // Determine file extension based on MIME type
+      let extension = 'webm'; // default fallback
+      if (audioBlob.type.includes('mpeg')) {
+        extension = 'mp3';
+      } else if (audioBlob.type.includes('mp4')) {
+        extension = 'm4a';
+      } else if (audioBlob.type.includes('ogg')) {
+        extension = 'ogg';
+      } else if (audioBlob.type.includes('wav')) {
+        extension = 'wav';
+      } else if (audioBlob.type.includes('webm')) {
+        extension = 'webm';
+      }
       
       a.download = `recording_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.${extension}`;
       document.body.appendChild(a);
@@ -255,11 +294,19 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
 
   const processRecording = () => {
     if (audioBlob) {
-      // Convert blob to File object with appropriate extension
-      let extension = 'webm';
-      if (audioBlob.type.includes('mp4')) extension = 'm4a';
-      else if (audioBlob.type.includes('ogg')) extension = 'ogg';
-      else if (audioBlob.type.includes('wav')) extension = 'wav';
+      // Convert blob to File object with appropriate extension based on MIME type
+      let extension = 'webm'; // default fallback
+      if (audioBlob.type.includes('mpeg')) {
+        extension = 'mp3';
+      } else if (audioBlob.type.includes('mp4')) {
+        extension = 'm4a';
+      } else if (audioBlob.type.includes('ogg')) {
+        extension = 'ogg';
+      } else if (audioBlob.type.includes('wav')) {
+        extension = 'wav';
+      } else if (audioBlob.type.includes('webm')) {
+        extension = 'webm';
+      }
       
       const file = new File([audioBlob], `recording_${Date.now()}.${extension}`, {
         type: audioBlob.type,
@@ -466,7 +513,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
 
         {/* Format Info */}
         <div className="text-xs sm:text-sm text-gray-500 space-y-1 mt-4">
-          <p>Recording format: Browser optimized (WebM/M4A)</p>
+          <p>Recording format: MP3 preferred, browser optimized fallback</p>
           <p>Browser microphone access required</p>
         </div>
       </div>
