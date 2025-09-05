@@ -12,10 +12,10 @@ import TranscriptionHistoryModal from './components/TranscriptionHistoryModal';
 import ActionTrackerModal from './components/ActionTrackerModal';
 import AudioUpload from './components/AudioUpload';
 import { TranscriptionStorage } from './utils/storageUtils';
-import { ProcessingState, TranscriptData, SummaryData, ExportPreferences } from './types';
+import { ProcessingState, TranscriptData, SummaryData, ExportPreferences, ProgressState } from './types';
 import { exportTranscriptAsDocx, exportSummaryAsDocx, exportTranscriptAsPdf, exportSummaryAsPdf } from './utils/exportUtils';
 import { transcribeAudio, diarizeSpeakers, generateSummary, validateAPIKeys, APIError } from './services/apiService';
-import { transcribeAudioViaEdgeFunction, generateSummaryViaEdgeFunction, EdgeFunctionError, checkSupabaseConnection } from './services/edgeFunctionService';
+import { transcribeAudioViaEdgeFunction, generateSummaryViaEdgeFunction, EdgeFunctionError, checkSupabaseConnection, ProgressCallback } from './services/edgeFunctionService';
 import { AudioProcessor } from './utils/audioUtils';
 
 // Local storage keys
@@ -52,7 +52,12 @@ function App() {
   }, []);
 
   const [processingState, setProcessingState] = useState<ProcessingState>('idle');
-  const [progress, setProgress] = useState(0);
+  const [progressState, setProgressState] = useState<ProgressState>({
+    phase: 'upload',
+    percentage: 0,
+    isIndeterminate: false,
+    message: 'Ready to start...'
+  });
   const [currentFile, setCurrentFile] = useState<File | null>(null);
   const [transcript, setTranscript] = useState<TranscriptData | null>(null);
   const [summary, setSummary] = useState<SummaryData | null>(null);
@@ -85,6 +90,20 @@ function App() {
     }
   }, []);
 
+  // Progress callback for real-time updates
+  const handleProgress: ProgressCallback = (phase, percentage, message, details) => {
+    setProgressState({
+      phase,
+      percentage,
+      isIndeterminate: details?.isIndeterminate || false,
+      message,
+      bytesUploaded: details?.bytesUploaded,
+      totalBytes: details?.totalBytes,
+      chunksReceived: details?.chunksReceived,
+      totalChunks: details?.totalChunks
+    });
+  };
+
   const handleFileUpload = async (file: File) => {
     // Prevent multiple simultaneous uploads
     if (isProcessing) {
@@ -94,7 +113,12 @@ function App() {
     setIsProcessing(true);
     setCurrentFile(file);
     setProcessingState('processing');
-    setProgress(0);
+    setProgressState({
+      phase: 'upload',
+      percentage: 0,
+      isIndeterminate: false,
+      message: 'Initializing...'
+    });
     setProcessingError(null);
     setTranscript(null);
     setSummary(null);
@@ -116,28 +140,13 @@ function App() {
     // Reset the input value to allow selecting the same file again
     e.target.value = '';
   };
+  
   const processAudioFile = async (file: File) => {
-    let processingStep = 'initialization';
     console.log('processAudioFile started for:', file.name);
     try {
-      // Step 1: Upload and validate (5%)
-      processingStep = 'validation';
-      console.log('Step 1: Validation');
-      setProgress(5);
-      await new Promise(resolve => setTimeout(resolve, 200));
-
-      // Check if compression is needed
-      processingStep = 'compression check';
-      const needsCompression = AudioProcessor.needsCompression(file);
-      if (needsCompression) {
-        setProgress(8);
-        // Note: Compression is handled inside transcribeAudio function
-      }
-
-      // Step 2: Transcription with OpenAI Whisper (40%)
-      processingStep = 'transcription';
-      console.log('Step 2: Starting transcription...');
-      setProgress(10);
+      // Validation
+      handleProgress('upload', 0, 'Validating audio file...');
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       let transcriptData: TranscriptData;
       
@@ -159,7 +168,7 @@ function App() {
 
       console.log('Valid OpenAI API key found, attempting transcription via edge function');
       try {
-        transcriptData = await transcribeAudioViaEdgeFunction(file, apiKeys.openai);
+        transcriptData = await transcribeAudioViaEdgeFunction(file, apiKeys.openai, handleProgress);
         console.log('Transcription successful via edge function');
       } catch (error) {
         console.error('Edge function transcription failed:', error);
@@ -168,18 +177,10 @@ function App() {
       }
       
       console.log('Transcription completed:', transcriptData);
-      setProgress(40);
-
-      // Step 3: Speaker Diarization (70%) - Skip for now as it's complex
-      processingStep = 'speaker diarization';
-      console.log('Step 3: Skipping speaker diarization (using single speaker)');
-      setProgress(70);
       setTranscript(transcriptData);
 
-      // Step 4: Summary Generation (100%)
-      processingStep = 'summary generation';
-      console.log('Step 4: Starting summary generation...');
-      setProgress(80);
+      // Summary Generation
+      console.log('Starting summary generation...');
       
       let summaryData: SummaryData;
       
@@ -196,7 +197,7 @@ function App() {
 
       console.log('Valid OpenAI API key found, attempting summary generation via edge function');
       try {
-        summaryData = await generateSummaryViaEdgeFunction(transcriptData, apiKeys.openai);
+        summaryData = await generateSummaryViaEdgeFunction(transcriptData, apiKeys.openai, handleProgress);
         console.log('Summary generation successful via edge function');
       } catch (error) {
         console.error('Edge function summary failed:', error);
@@ -205,7 +206,14 @@ function App() {
       }
       
       setSummary(summaryData);
-      setProgress(100);
+      
+      // Final completion
+      setProgressState({
+        phase: 'complete',
+        percentage: 100,
+        isIndeterminate: false,
+        message: 'Processing complete!'
+      });
       
       setProcessingState('completed');
       
@@ -220,7 +228,7 @@ function App() {
         });
       }
     } catch (error) {
-      console.error('Processing failed at step:', processingStep, error);
+      console.error('Processing failed:', error);
       setProcessingState('error');
       
       if (error instanceof APIError || error instanceof EdgeFunctionError) {
@@ -232,7 +240,7 @@ function App() {
           setShowSettings(true);
         }
       } else {
-        setProcessingError(`Processing failed at ${processingStep}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        setProcessingError(`Processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     }
   };
@@ -246,7 +254,12 @@ function App() {
     console.log('resetApp called');
     setIsProcessing(false);
     setProcessingState('idle');
-    setProgress(0);
+    setProgressState({
+      phase: 'upload',
+      percentage: 0,
+      isIndeterminate: false,
+      message: 'Ready to start...'
+    });
     setCurrentFile(null);
     setTranscript(null);
     setSummary(null);
@@ -423,14 +436,7 @@ function App() {
                 <p className="text-gray-600">{currentFile?.name}</p>
                 <p className="text-sm text-gray-500 mt-2">Please wait, this may take several minutes...</p>
               </div>
-              <ProgressBar progress={progress} />
-              <div className="mt-4 text-center text-sm text-gray-500">
-                {progress < 10 && "Uploading and validating audio file..."}
-                {progress >= 10 && progress < 40 && "Transcribing audio with OpenAI Whisper..."}
-                {progress >= 40 && progress < 70 && "Performing speaker diarization with Hugging Face..."}
-                {progress >= 70 && progress < 100 && "Generating summary with GPT-3.5..."}
-                {progress === 100 && "Processing complete!"}
-              </div>
+              <ProgressBar progressState={progressState} />
               <div className="mt-6 text-center">
                 <button
                   onClick={resetApp}
