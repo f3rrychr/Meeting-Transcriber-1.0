@@ -100,7 +100,9 @@ function App() {
       bytesUploaded: details?.bytesUploaded,
       totalBytes: details?.totalBytes,
       chunksReceived: details?.chunksReceived,
-      totalChunks: details?.totalChunks
+      totalChunks: details?.totalChunks,
+      retryAttempt: details?.retryAttempt,
+      retryCountdown: details?.retryCountdown
     });
   };
 

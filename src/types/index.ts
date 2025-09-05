@@ -581,6 +581,8 @@ export interface ProgressState {
   totalBytes?: number;
   chunksReceived?: number;
   totalChunks?: number;
+  retryAttempt?: number;
+  retryCountdown?: number;
 }
 
 export default App;
