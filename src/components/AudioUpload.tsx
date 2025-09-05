@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { Upload, FileAudio, AlertCircle, Mic } from 'lucide-react';
-import { AudioProcessor } from '../utils/audioUtils';
+import { validateAudioFile, getSupportedFormats, getFileAcceptString } from '../utils/fileValidation';
 import AudioRecorder from './AudioRecorder';
 
 interface AudioUploadProps {
@@ -10,31 +10,34 @@ interface AudioUploadProps {
 const AudioUpload: React.FC<AudioUploadProps> = ({ onFileUpload }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [validationDetails, setValidationDetails] = useState<{
+    detectedType?: string;
+    remediationTip?: string;
+  } | null>(null);
   const [activeTab, setActiveTab] = useState<'record' | 'upload'>('record');
 
-  const validateFile = (file: File): string | null => {
-    const maxSize = 500 * 1024 * 1024; // 500MB - much more generous limit
-    const supportedTypes = ['audio/mpeg', 'audio/wav', 'audio/aac', 'audio/mp4', 'audio/x-m4a', 'audio/ogg', 'audio/webm'];
+  const handleFile = async (file: File) => {
+    setError(null);
+    setValidationDetails(null);
     
-    if (file.size > maxSize) {
-      return 'File size exceeds 500MB limit. Please use a smaller audio file.';
-    }
+    const validation = await validateAudioFile(file);
     
-    if (!supportedTypes.includes(file.type) && !file.name.match(/\.(mp3|wav|aac|m4a|ogg|webm)$/i)) {
-      return 'Unsupported file format. Please use MP3, WAV, AAC, M4A, or OGG files.';
-    }
-    
-    return null;
-  };
-
-  const handleFile = (file: File) => {
-    const validationError = validateFile(file);
-    if (validationError) {
-      setError(validationError);
+    if (!validation.isValid) {
+      setError(validation.error || 'File validation failed');
+      setValidationDetails({
+        detectedType: validation.detectedType,
+        remediationTip: validation.remediationTip
+      });
       return;
     }
     
-    setError(null);
+    // Show detected format for user confirmation
+    if (validation.detectedType) {
+      setValidationDetails({
+        detectedType: validation.detectedType
+      });
+    }
+    
     onFileUpload(file);
   };
 
@@ -67,6 +70,9 @@ const AudioUpload: React.FC<AudioUploadProps> = ({ onFileUpload }) => {
 
   return (
     <div className="max-w-4xl w-full mx-auto px-4 sm:px-0">
+  const supportedFormats = getSupportedFormats();
+  const fileAcceptString = getFileAcceptString();
+
       {/* Content based on active tab */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Left Side - Recording */}
@@ -106,13 +112,13 @@ const AudioUpload: React.FC<AudioUploadProps> = ({ onFileUpload }) => {
                   <input
                     type="file"
                     className="hidden"
-                    accept=".mp3,.wav,.aac,.m4a,.ogg,.webm"
+                    accept={fileAcceptString}
                     onChange={handleFileSelect}
                   />
                 </label>
                 
                 <div className="text-xs text-gray-500 space-y-1">
-                  <p>Supported formats: MP3, WAV, AAC, M4A, OGG, WebM</p>
+                  <p>Supported formats: {supportedFormats.join(', ')}</p>
                   <p>Large files will be automatically processed</p>
                 </div>
               </div>
@@ -122,11 +128,43 @@ const AudioUpload: React.FC<AudioUploadProps> = ({ onFileUpload }) => {
       </div>
 
       {error && (
-        <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start">
-          <AlertCircle className="w-5 h-5 text-red-600 mr-3 mt-0.5 flex-shrink-0" />
-          <div>
-            <h3 className="font-medium text-red-800">Upload Error</h3>
-            <p className="text-red-700 mt-1">{error}</p>
+        <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-start">
+            <AlertCircle className="w-5 h-5 text-red-600 mr-3 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <h3 className="font-medium text-red-800">Upload Error</h3>
+              <p className="text-red-700 mt-1">{error}</p>
+              
+              {validationDetails?.detectedType && (
+                <p className="text-red-600 mt-2 text-sm">
+                  <strong>Detected format:</strong> {validationDetails.detectedType}
+                </p>
+              )}
+              
+              {validationDetails?.remediationTip && (
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded">
+                  <p className="text-blue-800 text-sm">
+                    <strong>💡 Solution:</strong> {validationDetails.remediationTip}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {!error && validationDetails?.detectedType && (
+        <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-start">
+            <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center mr-3 mt-0.5 flex-shrink-0">
+              <span className="text-white text-xs">✓</span>
+            </div>
+            <div>
+              <h3 className="font-medium text-green-800">File Validated</h3>
+              <p className="text-green-700 mt-1">
+                Detected format: <strong>{validationDetails.detectedType}</strong>
+              </p>
+            </div>
           </div>
         </div>
       )}
