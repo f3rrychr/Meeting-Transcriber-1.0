@@ -17,7 +17,6 @@ import { exportTranscriptAsDocx, exportSummaryAsDocx, exportTranscriptAsPdf, exp
 import { transcribeAudio, diarizeSpeakers, generateSummary, validateAPIKeys, APIError } from './services/apiService';
 import { transcribeAudioViaEdgeFunction, generateSummaryViaEdgeFunction, EdgeFunctionError, checkSupabaseConnection } from './services/edgeFunctionService';
 import { AudioProcessor } from './utils/audioUtils';
-import { TranscriptionStorage } from './utils/storageUtils';
 
 // Local storage keys
 const STORAGE_KEYS = {
