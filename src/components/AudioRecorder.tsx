@@ -31,16 +31,46 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
 
   const startRecording = async () => {
     try {
+      // Request microphone permission explicitly
+      const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+      if (permissionStatus.state === 'denied') {
+        alert('Microphone access is denied. Please enable microphone permissions in your browser settings.');
+        return;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
+          // Ensure we're getting microphone input, not system audio
+          autoGainControl: true,
           echoCancellation: true,
           noiseSuppression: true,
-          sampleRate: 44100
+          sampleRate: 44100,
+          channelCount: 1, // Mono recording for better compatibility
+          // Explicitly request microphone (not system audio)
+          deviceId: 'default'
         } 
       });
       
-      // Use webm format which is widely supported, then convert filename based on preference
-      const mimeType = 'audio/webm;codecs=opus';
+      // Check for supported MIME types and use the best available
+      let mimeType = 'audio/webm;codecs=opus';
+      
+      // Try different MIME types in order of preference for MP3 compatibility
+      const supportedTypes = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4',
+        'audio/ogg;codecs=opus',
+        'audio/wav'
+      ];
+      
+      for (const type of supportedTypes) {
+        if (MediaRecorder.isTypeSupported(type)) {
+          mimeType = type;
+          break;
+        }
+      }
+      
+      console.log('Using MIME type:', mimeType);
       
       const mediaRecorder = new MediaRecorder(stream, { mimeType });
       
@@ -54,6 +84,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
       };
       
       mediaRecorder.onstop = () => {
+        // Create blob with the recorded MIME type but label as MP3 for download
         const blob = new Blob(audioChunksRef.current, { type: mimeType });
         setAudioBlob(blob);
         
@@ -65,7 +96,8 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
         stream.getTracks().forEach(track => track.stop());
       };
       
-      mediaRecorder.start(1000); // Collect data every second
+      // Start recording with smaller chunks for better real-time feedback
+      mediaRecorder.start(100); // Collect data every 100ms
       setIsRecording(true);
       setIsPaused(false);
       setRecordingTime(0);
@@ -77,7 +109,17 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
       
     } catch (error) {
       console.error('Error accessing microphone:', error);
-      alert('Unable to access microphone. Please check your browser permissions.');
+      
+      // Provide more specific error messages
+      if (error.name === 'NotAllowedError') {
+        alert('Microphone access denied. Please allow microphone access and try again.');
+      } else if (error.name === 'NotFoundError') {
+        alert('No microphone found. Please connect a microphone and try again.');
+      } else if (error.name === 'NotReadableError') {
+        alert('Microphone is being used by another application. Please close other apps using the microphone.');
+      } else {
+        alert(`Unable to access microphone: ${error.message}. Please check your browser permissions and microphone connection.`);
+      }
     }
   };
 
@@ -130,7 +172,9 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
       const url = URL.createObjectURL(audioBlob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `recording_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.mp3`;
+      // Use .webm extension if that's what we recorded, but indicate it's audio
+      const extension = audioBlob.type.includes('webm') ? 'webm' : 'mp3';
+      a.download = `recording_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.${extension}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -151,8 +195,9 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
   const processRecording = () => {
     if (audioBlob) {
       // Convert blob to File object
-      const file = new File([audioBlob], `recording_${Date.now()}.mp3`, {
-        type: 'audio/mpeg',
+      const extension = audioBlob.type.includes('webm') ? 'webm' : 'mp3';
+      const file = new File([audioBlob], `recording_${Date.now()}.${extension}`, {
+        type: audioBlob.type,
         lastModified: Date.now()
       });
       onRecordingComplete(file);
@@ -281,7 +326,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
 
         {/* Format Info */}
         <div className="text-xs sm:text-sm text-gray-500 space-y-1 mt-4">
-          <p>Recording format: MP3 (Compressed)</p>
+          <p>Recording format: WebM/MP3 (Compressed)</p>
           <p>Browser microphone access required</p>
         </div>
       </div>
