@@ -411,11 +411,16 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
                 ref={audioRef}
                 src={audioUrl || undefined}
                 preload="auto"
-                controls={false}
+                controls={true}
+                volume={1.0}
+                muted={false}
                 onEnded={() => setIsPlaying(false)}
                 onLoadedData={() => addDebugInfo('Audio loaded and ready to play')}
                 onError={(e) => addDebugInfo(`Audio error: ${e.currentTarget.error?.message || 'Unknown error'}`)}
-                className="hidden"
+                onVolumeChange={(e) => addDebugInfo(`Volume changed to: ${e.currentTarget.volume}`)}
+                onPlay={() => addDebugInfo('Audio play event fired')}
+                onPause={() => addDebugInfo('Audio pause event fired')}
+                className="w-full mb-3"
               />
               
               {/* Playback Controls */}
@@ -427,6 +432,17 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
                 >
                   {isPlaying ? <Pause className="w-4 h-4 mr-2" /> : <Play className="w-4 h-4 mr-2" />}
                   {isPlaying ? 'Pause' : 'Play'}
+                </button>
+                <button
+                  onClick={() => {
+                    if (audioRef.current) {
+                      audioRef.current.currentTime = 0;
+                      addDebugInfo('Audio reset to beginning');
+                    }
+                  }}
+                  className="flex items-center px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm"
+                >
+                  Reset
                 </button>
                 <button
                   onClick={downloadRecording}
@@ -442,6 +458,23 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
                   <X className="w-4 h-4 mr-2" />
                   Cancel
                 </button>
+              </div>
+
+              {/* Volume and Audio Info */}
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="text-xs font-medium text-blue-800 mb-2">Audio Info:</div>
+                <div className="space-y-1 text-xs text-blue-700">
+                  <div>Blob Size: {audioBlob.size} bytes</div>
+                  <div>Blob Type: {audioBlob.type}</div>
+                  {audioRef.current && (
+                    <>
+                      <div>Duration: {audioRef.current.duration ? audioRef.current.duration.toFixed(2) + 's' : 'Loading...'}</div>
+                      <div>Volume: {audioRef.current.volume}</div>
+                      <div>Muted: {audioRef.current.muted ? 'Yes' : 'No'}</div>
+                      <div>Ready State: {audioRef.current.readyState}</div>
+                    </>
+                  )}
+                </div>
               </div>
 
               {/* Process Button */}
