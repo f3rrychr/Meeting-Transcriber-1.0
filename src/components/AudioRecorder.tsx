@@ -5,8 +5,6 @@ interface AudioRecorderProps {
   onRecordingComplete: (file: File) => void;
 }
 
-type RecordingFormat = 'wav' | 'mp3';
-
 const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -14,7 +12,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [recordingFormat, setRecordingFormat] = useState<RecordingFormat>('mp3');
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -133,7 +130,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
       const url = URL.createObjectURL(audioBlob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `recording_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.${recordingFormat}`;
+      a.download = `recording_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.mp3`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -154,8 +151,8 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
   const processRecording = () => {
     if (audioBlob) {
       // Convert blob to File object
-      const file = new File([audioBlob], `recording_${Date.now()}.${recordingFormat}`, {
-        type: recordingFormat === 'mp3' ? 'audio/mpeg' : 'audio/wav',
+      const file = new File([audioBlob], `recording_${Date.now()}.mp3`, {
+        type: 'audio/mpeg',
         lastModified: Date.now()
       });
       onRecordingComplete(file);
@@ -180,39 +177,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
         <p className="text-sm sm:text-base text-gray-600 mb-6 sm:mb-8">
           Record your meeting directly in the browser
         </p>
-
-        {/* Format Selection */}
-        {!isRecording && !audioBlob && (
-          <div className="mb-6 flex-shrink-0">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Recording Format
-            </label>
-            <div className="flex justify-center space-x-4">
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  name="format"
-                  value="mp3"
-                  checked={recordingFormat === 'mp3'}
-                  onChange={(e) => setRecordingFormat(e.target.value as RecordingFormat)}
-                  className="mr-2"
-                />
-                <span className="text-sm text-gray-700">MP3 (Compressed)</span>
-              </label>
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  name="format"
-                  value="wav"
-                  checked={recordingFormat === 'wav'}
-                  onChange={(e) => setRecordingFormat(e.target.value as RecordingFormat)}
-                  className="mr-2"
-                />
-                <span className="text-sm text-gray-700">WAV (High Quality)</span>
-              </label>
-            </div>
-          </div>
-        )}
 
         {/* Recording Controls */}
         {!isRecording && !audioBlob && (
@@ -317,7 +281,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
 
         {/* Format Info */}
         <div className="text-xs sm:text-sm text-gray-500 space-y-1 mt-4">
-          <p>Recording format: {recordingFormat.toUpperCase()} {recordingFormat === 'wav' ? '(High Quality)' : '(Compressed)'}</p>
+          <p>Recording format: MP3 (Compressed)</p>
           <p>Browser microphone access required</p>
         </div>
       </div>
