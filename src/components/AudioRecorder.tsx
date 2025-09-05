@@ -466,39 +466,9 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
                   }}
                   className="flex items-center px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm"
                 >
-                  Reset
-                </button>
-                <button
-                  onClick={downloadRecording}
-                  className="flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Save
-                </button>
-                <button
-                  onClick={deleteRecording}
-                  className="flex items-center px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors text-sm"
-                >
                   <X className="w-4 h-4 mr-2" />
                   Cancel
                 </button>
-              </div>
-
-              {/* Volume and Audio Info */}
-              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="text-xs font-medium text-blue-800 mb-2">Audio Info:</div>
-                <div className="space-y-1 text-xs text-blue-700">
-                  <div>Blob Size: {audioBlob.size} bytes</div>
-                  <div>Blob Type: {audioBlob.type}</div>
-                  {audioRef.current && (
-                    <>
-                      <div>Duration: {audioRef.current.duration ? audioRef.current.duration.toFixed(2) + 's' : 'Loading...'}</div>
-                      <div>Volume: {audioRef.current.volume}</div>
-                      <div>Muted: {audioRef.current.muted ? 'Yes' : 'No'}</div>
-                      <div>Ready State: {audioRef.current.readyState}</div>
-                    </>
-                  )}
-                </div>
               </div>
 
               {/* Process Button */}
