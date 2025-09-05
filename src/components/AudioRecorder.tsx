@@ -303,20 +303,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
             {microphoneStatus === 'error' && '✗ Microphone error'}
           </div>
         </div>
-
-        {/* Debug Information */}
-        {debugInfo.length > 0 && (
-          <div className="mb-4 p-3 bg-gray-100 rounded-lg text-left">
-            <div className="text-xs font-medium text-gray-700 mb-2">Debug Info:</div>
-            <div className="space-y-1">
-              {debugInfo.map((info, index) => (
-                <div key={index} className="text-xs text-gray-600 font-mono">
-                  {info}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
         {/* Recording Controls */}
         {!isRecording && !audioBlob && microphoneStatus === 'available' && (
           <div className="flex justify-center">
