@@ -175,14 +175,22 @@ export const generateSummaryViaEdgeFunction = async (transcript: TranscriptData,
 };
 
 export const checkSupabaseConnection = (): boolean => {
-  const hasConnection = !!(SUPABASE_URL && SUPABASE_ANON_KEY && 
-    SUPABASE_URL !== 'your_supabase_project_url' && 
-    SUPABASE_ANON_KEY !== 'your_supabase_anon_key'
-  );
   // Check if environment variables exist and aren't placeholder values
-  const hasUrl = SUPABASE_URL && SUPABASE_URL !== 'your_supabase_project_url';
-  const hasKey = SUPABASE_ANON_KEY && SUPABASE_ANON_KEY !== 'your_supabase_anon_key';
+  const hasUrl = SUPABASE_URL && 
+    SUPABASE_URL !== 'your_supabase_project_url' && 
+    SUPABASE_URL !== 'undefined' &&
+    SUPABASE_URL !== 'null' &&
+    !SUPABASE_URL.includes('your_') &&
+    !SUPABASE_URL.includes('placeholder') &&
+    SUPABASE_URL.startsWith('https://');
+  
+  const hasKey = SUPABASE_ANON_KEY && 
+    SUPABASE_ANON_KEY !== 'your_supabase_anon_key' && 
+    SUPABASE_ANON_KEY !== 'undefined' &&
+    SUPABASE_ANON_KEY !== 'null' &&
+    !SUPABASE_ANON_KEY.includes('your_') &&
+    !SUPABASE_ANON_KEY.includes('placeholder') &&
+    SUPABASE_ANON_KEY.startsWith('eyJ');
   
   return !!(hasUrl && hasKey);
-  return hasConnection;
 };

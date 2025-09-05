@@ -34,7 +34,24 @@ const ConnectionStatus: React.FC = () => {
       keyValue: supabaseKey ? `${supabaseKey.substring(0, 10)}...` : 'undefined'
     });
 
-    if (!supabaseUrl || !supabaseKey) {
+    // Enhanced placeholder detection
+    const isValidUrl = supabaseUrl && 
+      supabaseUrl !== 'your_supabase_project_url' && 
+      supabaseUrl !== 'undefined' &&
+      supabaseUrl !== 'null' &&
+      !supabaseUrl.includes('your_') &&
+      !supabaseUrl.includes('placeholder') &&
+      supabaseUrl.startsWith('https://');
+    
+    const isValidKey = supabaseKey && 
+      supabaseKey !== 'your_supabase_anon_key' && 
+      supabaseKey !== 'undefined' &&
+      supabaseKey !== 'null' &&
+      !supabaseKey.includes('your_') &&
+      !supabaseKey.includes('placeholder') &&
+      supabaseKey.startsWith('eyJ');
+
+    if (!isValidUrl || !isValidKey) {
       setSupabaseStatus('disconnected');
       return;
     }
@@ -44,13 +61,8 @@ const ConnectionStatus: React.FC = () => {
       const testUrl = `${supabaseUrl}/functions/v1/transcribe-audio`;
       console.log('Testing edge function connectivity to:', testUrl);
       
-      // Don't actually test the connection to avoid CORS issues
-      // Just check if the URL looks valid
-      if (supabaseUrl.startsWith('https://') && supabaseKey.startsWith('eyJ')) {
-        setSupabaseStatus('connected');
-      } else {
-        setSupabaseStatus('disconnected');
-      }
+      // If we reach here, both URL and key are valid
+      setSupabaseStatus('connected');
     } catch (error) {
       console.error('Edge function connectivity test failed:', error);
       setSupabaseStatus('disconnected');
@@ -90,6 +102,23 @@ const ConnectionStatus: React.FC = () => {
     }
   };
 
+  // Enhanced placeholder detection (moved outside checkConnection for UI use)
+  const isValidUrl = envVars.url && 
+    envVars.url !== 'your_supabase_project_url' && 
+    envVars.url !== 'undefined' &&
+    envVars.url !== 'null' &&
+    !envVars.url.includes('your_') &&
+    !envVars.url.includes('placeholder') &&
+    envVars.url.startsWith('https://');
+  
+  const isValidKey = envVars.key && 
+    envVars.key !== 'your_supabase_anon_key' && 
+    envVars.key !== 'undefined' &&
+    envVars.key !== 'null' &&
+    !envVars.key.includes('your_') &&
+    !envVars.key.includes('placeholder') &&
+    envVars.key.startsWith('eyJ');
+
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-6">
       <h3 className="text-lg font-semibold text-gray-900 mb-4">Supabase Connection Status</h3>
@@ -115,14 +144,14 @@ const ConnectionStatus: React.FC = () => {
           <div className="space-y-2 text-sm">
             <div className="flex items-center justify-between">
               <span>VITE_SUPABASE_URL:</span>
-              <span className={envVars.url ? 'text-green-600' : 'text-red-600'}>
-                {envVars.url ? '✓ Set' : '✗ Missing'}
+              <span className={isValidUrl ? 'text-green-600' : 'text-red-600'}>
+                {isValidUrl ? '✓ Valid' : envVars.url ? '⚠ Placeholder' : '✗ Missing'}
               </span>
             </div>
             <div className="flex items-center justify-between">
               <span>VITE_SUPABASE_ANON_KEY:</span>
-              <span className={envVars.key ? 'text-green-600' : 'text-red-600'}>
-                {envVars.key ? '✓ Set' : '✗ Missing'}
+              <span className={isValidKey ? 'text-green-600' : 'text-red-600'}>
+                {isValidKey ? '✓ Valid' : envVars.key ? '⚠ Placeholder' : '✗ Missing'}
               </span>
             </div>
           </div>
