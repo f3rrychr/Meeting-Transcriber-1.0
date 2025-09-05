@@ -66,7 +66,7 @@ export const transcribeAudioViaEdgeFunction = async (file: File, apiKey: string)
       }
       
       if (response.status === 413) {
-        throw new EdgeFunctionError('File too large. Please use a file smaller than 25MB.');
+        throw new EdgeFunctionError('File too large. Please try with a smaller audio file.');
       }
       
       throw new EdgeFunctionError(
