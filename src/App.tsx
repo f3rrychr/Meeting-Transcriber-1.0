@@ -1,583 +1,424 @@
-import React, { useState, useRef } from 'react';
-import { Upload, FileAudio, Settings, Download, Copy, Play, Pause, RefreshCw, X } from 'lucide-react';
-import MenuBar from './components/MenuBar';
-import TranscriptPanel from './components/TranscriptPanel';
-import SummaryPanel from './components/SummaryPanel';
-import ProgressBar from './components/ProgressBar';
-import SettingsModal from './components/SettingsModal';
-import AboutModal from './components/AboutModal';
-import ExportPreferencesModal from './components/ExportPreferencesModal';
-import UserGuideModal from './components/UserGuideModal';
-import TranscriptionHistoryModal from './components/TranscriptionHistoryModal';
-import ActionTrackerModal from './components/ActionTrackerModal';
-import AudioUpload from './components/AudioUpload';
-import { TranscriptionStorage } from './utils/storageUtils';
-import { ProcessingState, TranscriptData, SummaryData, ExportPreferences, ProgressState } from './types';
-import { exportTranscriptAsDocx, exportSummaryAsDocx, exportTranscriptAsPdf, exportSummaryAsPdf } from './utils/exportUtils';
-import { transcribeAudio, diarizeSpeakers, generateSummary, validateAPIKeys, APIError } from './services/apiService';
-import { transcribeAudioViaEdgeFunction, generateSummaryViaEdgeFunction, EdgeFunctionError, checkSupabaseConnection, ProgressCallback } from './services/edgeFunctionService';
-import { AudioProcessor } from './utils/audioUtils';
+// Edge Function Service for real API calls through Supabase
+import { TranscriptData, SummaryData } from '../types';
+import { StandardError } from '../types';
+import { streamFileUpload, validateFileStream, StreamError } from '../utils/streamUtils';
 
-// Local storage keys
-const STORAGE_KEYS = {
-  API_KEYS: 'meeting-transcriber-api-keys'
-};
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Load API keys from localStorage
-const loadAPIKeys = (): { openai: string; huggingface: string } => {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEYS.API_KEYS);
-    if (stored) {
-      return JSON.parse(stored);
-    }
-  } catch (error) {
-    console.warn('Failed to load API keys from localStorage:', error);
-  }
-  return { openai: '', huggingface: '' };
-};
-
-// Save API keys to localStorage
-const saveAPIKeys = (keys: { openai: string; huggingface: string }) => {
-  try {
-    localStorage.setItem(STORAGE_KEYS.API_KEYS, JSON.stringify(keys));
-  } catch (error) {
-    console.warn('Failed to save API keys to localStorage:', error);
-  }
-};
-
-function App() {
-  // Initialize storage on app startup
-  React.useEffect(() => {
-    TranscriptionStorage.initialize();
-  }, []);
-
-  const [processingState, setProcessingState] = useState<ProcessingState>('idle');
-  const [progressState, setProgressState] = useState<ProgressState>({
-    phase: 'upload',
-    percentage: 0,
-    isIndeterminate: false,
-    message: 'Ready to start...'
-  });
-  const [currentFile, setCurrentFile] = useState<File | null>(null);
-  const [transcript, setTranscript] = useState<TranscriptData | null>(null);
-  const [summary, setSummary] = useState<SummaryData | null>(null);
-  const [showSettings, setShowSettings] = useState(false);
-  const [showAbout, setShowAbout] = useState(false);
-  const [showExportPrefs, setShowExportPrefs] = useState(false);
-  const [showUserGuide, setShowUserGuide] = useState(false);
-  const [showTranscriptionHistory, setShowTranscriptionHistory] = useState(false);
-  const [showActionTracker, setShowActionTracker] = useState(false);
-  const [apiKeys, setApiKeys] = useState(loadAPIKeys());
-  const [processingError, setProcessingError] = useState<string | null>(null);
-  const [viewingRecord, setViewingRecord] = useState<{ transcript?: TranscriptData; summary?: SummaryData } | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [exportPreferences, setExportPreferences] = useState<ExportPreferences>({
-    defaultFormat: 'txt',
-    includeTimestamps: true,
-    timestampInterval: 5,
-    defaultLocation: 'source',
-    customLocation: '',
-    filenamePrefix: '',
-    includeSpeakerLabels: true,
-    includeMetadata: true
-  });
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Request notification permission on app load
-  React.useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
-  }, []);
-
-  // Progress callback for real-time updates
-  const handleProgress: ProgressCallback = (phase, percentage, message, details) => {
-    setProgressState({
-      phase,
-      percentage,
-      isIndeterminate: details?.isIndeterminate || false,
-      message,
-      bytesUploaded: details?.bytesUploaded,
-      totalBytes: details?.totalBytes,
-      chunksReceived: details?.chunksReceived,
-      totalChunks: details?.totalChunks,
-      retryAttempt: details?.retryAttempt,
-      retryCountdown: details?.retryCountdown
-    });
-  };
-
-  const handleFileUpload = async (file: File) => {
-    // Prevent multiple simultaneous uploads
-    if (isProcessing) {
-      return;
-    }
-
-    setIsProcessing(true);
-    setCurrentFile(file);
-    setProcessingState('processing');
-    setProgressState({
-      phase: 'upload',
-      percentage: 0,
-      isIndeterminate: false,
-      message: 'Initializing...'
-    });
-    setProcessingError(null);
-    setTranscript(null);
-    setSummary(null);
-    setViewingRecord(null);
-    
-    await processAudioFile(file);
-    setIsProcessing(false);
-  };
-
-  const triggerFileSelect = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      handleFileUpload(files[0]);
-    }
-    // Reset the input value to allow selecting the same file again
-    e.target.value = '';
-  };
-  
-  const processAudioFile = async (file: File) => {
-    console.log('processAudioFile started for:', file.name);
-    try {
-      // Validation
-      handleProgress('upload', 0, 'Validating audio file...');
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      let transcriptData: TranscriptData;
-      
-      // Determine which service to use based on API key and Supabase availability
-      const hasValidApiKey = apiKeys.openai && apiKeys.openai.trim() !== '' && apiKeys.openai.startsWith('sk-');
-      
-      if (!hasValidApiKey) {
-        throw new EdgeFunctionError('OpenAI API key is required. Please add your API key in Settings.');
-      }
-
-      // Check if Supabase is connected before attempting transcription
-      const hasSupabaseConnection = checkSupabaseConnection();
-      
-      if (!hasSupabaseConnection) {
-        setProcessingState('error');
-        setProcessingError('Supabase connection is required. Please click "Connect to Supabase" in the top right corner to set up your Supabase project.');
-        return;
-      }
-
-      console.log('Valid OpenAI API key found, attempting transcription via edge function');
-      try {
-        transcriptData = await transcribeAudioViaEdgeFunction(file, apiKeys.openai, handleProgress);
-        console.log('Transcription successful via edge function');
-      } catch (error) {
-        console.error('Edge function transcription failed:', error);
-        // Re-throw the error to show the user what went wrong
-        throw error;
-      }
-      
-      console.log('Transcription completed:', transcriptData);
-      setTranscript(transcriptData);
-
-      // Summary Generation
-      console.log('Starting summary generation...');
-      
-      let summaryData: SummaryData;
-      
-      if (!hasValidApiKey) {
-        throw new EdgeFunctionError('OpenAI API key is required for summary generation. Please add your API key in Settings.');
-      }
-
-      // Check if Supabase is connected before attempting summary generation
-      if (!hasSupabaseConnection) {
-        setProcessingState('error');
-        setProcessingError('Supabase connection is required for summary generation. Please click "Connect to Supabase" in the top right corner.');
-        return;
-      }
-
-      console.log('Valid OpenAI API key found, attempting summary generation via edge function');
-      try {
-        summaryData = await generateSummaryViaEdgeFunction(transcriptData, apiKeys.openai, handleProgress);
-        console.log('Summary generation successful via edge function');
-      } catch (error) {
-        console.error('Edge function summary failed:', error);
-        // Re-throw the error to show the user what went wrong
-        throw error;
-      }
-      
-      setSummary(summaryData);
-      
-      // Final completion
-      setProgressState({
-        phase: 'complete',
-        percentage: 100,
-        isIndeterminate: false,
-        message: 'Processing complete!'
-      });
-      
-      setProcessingState('completed');
-      
-      // Save transcription to history
-      TranscriptionStorage.saveTranscription(file.name, transcriptData, summaryData);
-      
-      // Show success notification
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('Meeting Transcriber', {
-          body: `Transcription completed for ${file.name}`,
-          icon: '/favicon.ico'
-        });
-      }
-    } catch (error) {
-      console.error('Processing failed:', error);
-      setProcessingState('error');
-      
-      if (error instanceof APIError || error instanceof EdgeFunctionError) {
-        const standardError = error instanceof APIError ? error.toStandardError() : error.toStandardError();
-        setProcessingError(`${standardError.apiType?.toUpperCase() || 'API'} Error: ${standardError.error}`);
-        
-        // If it's an API key error or missing connection, open settings
-        if (standardError.statusCode === 401 || standardError.error.includes('API key') || standardError.error.includes('Supabase connection')) {
-          setShowSettings(true);
-        }
-      } else {
-        setProcessingError(`Processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
-    }
-  };
-
-  const handleSaveAPIKeys = (keys: { openai: string; huggingface: string }) => {
-    setApiKeys(keys);
-    saveAPIKeys(keys);
-  };
-
-  const resetApp = () => {
-    console.log('resetApp called');
-    setIsProcessing(false);
-    setProcessingState('idle');
-    setProgressState({
-      phase: 'upload',
-      percentage: 0,
-      isIndeterminate: false,
-      message: 'Ready to start...'
-    });
-    setCurrentFile(null);
-    setTranscript(null);
-    setSummary(null);
-    setProcessingError(null);
-  };
-
-  const handleExportTranscript = () => {
-    if (!transcript || !currentFile) return;
-    
-    const fileName = currentFile.name.replace(/\.[^/.]+$/, "");
-    
-    if (exportPreferences.defaultFormat === 'docx') {
-      exportTranscriptAsDocx(transcript, fileName, exportPreferences.includeTimestamps);
-    } else if (exportPreferences.defaultFormat === 'pdf') {
-      exportTranscriptAsPdf(transcript, fileName, exportPreferences.includeTimestamps);
-    } else {
-      // TXT format
-      let content = `Meeting Transcript\n`;
-      content += `==================\n\n`;
-      content += `Meeting: ${transcript.meetingTitle}\n`;
-      content += `Date: ${transcript.meetingDate}\n`;
-      content += `Duration: ${transcript.duration}\n`;
-      content += `Word Count: ${transcript.wordCount}\n\n`;
-      content += `Transcript:\n`;
-      content += `-----------\n\n`;
-      
-      transcript.speakers.forEach(speaker => {
-        content += `${speaker.id}:\n`;
-        speaker.segments.forEach(segment => {
-          if (exportPreferences.includeTimestamps) {
-            content += `[${segment.timestamp}] ${segment.text}\n`;
-          } else {
-            content += `${segment.text}\n`;
-          }
-        });
-        content += `\n`;
-      });
-      
-      const blob = new Blob([content], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${fileName}_transcript.txt`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }
-  };
-
-  const handleExportSummary = () => {
-    if (!summary || !currentFile) return;
-    
-    const fileName = currentFile.name.replace(/\.[^/.]+$/, "");
-    
-    if (exportPreferences.defaultFormat === 'docx') {
-      exportSummaryAsDocx(summary, fileName);
-    } else if (exportPreferences.defaultFormat === 'pdf') {
-      exportSummaryAsPdf(summary, fileName);
-    } else {
-      // TXT format
-      let content = `Meeting Summary\n`;
-      content += `===============\n\n`;
-      content += `Meeting: ${summary.meetingContext.meetingName}\n`;
-      content += `Date: ${summary.meetingContext.meetingDate}\n`;
-      content += `Participants: ${summary.meetingContext.participants.join(', ')}\n\n`;
-      
-      content += `Key Points:\n`;
-      content += `-----------\n`;
-      summary.keyPoints.forEach((point, index) => {
-        content += `${index + 1}. ${point}\n`;
-      });
-      content += `\n`;
-      
-      content += `Action Items:\n`;
-      content += `-------------\n`;
-      summary.actionItems.forEach((item, index) => {
-        content += `${index + 1}. ${item.task}\n`;
-        content += `   PIC: ${item.assignee}\n`;
-        content += `   Due: ${item.dueDate}\n`;
-        if (item.remarks) {
-          content += `   Remarks: ${item.remarks}\n`;
-        }
-        content += `\n`;
-      });
-      
-      content += `Risks & Issues:\n`;
-      content += `---------------\n`;
-      summary.risks.forEach((risk, index) => {
-        content += `${index + 1}. [${risk.type}] ${risk.category}: ${risk.item}\n`;
-        if (risk.remarks) {
-          content += `   Remarks: ${risk.remarks}\n`;
-        }
-        content += `\n`;
-      });
-      
-      content += `Next Meeting:\n`;
-      content += `-------------\n`;
-      content += `Meeting: ${summary.nextMeetingPlan.meetingName}\n`;
-      content += `Date & Time: ${summary.nextMeetingPlan.scheduledDate} at ${summary.nextMeetingPlan.scheduledTime}\n`;
-      content += `Agenda: ${summary.nextMeetingPlan.agenda}\n\n`;
-      
-      const blob = new Blob([content], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${fileName}_summary.txt`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }
-  };
-
-  const handleViewTranscription = (record: any) => {
-    setShowTranscriptionHistory(false);
-    setTranscript(record.transcript);
-    setSummary(record.summary);
-    setCurrentFile(new File([], record.fileName));
-    setProcessingState('completed');
-    setViewingRecord({ transcript: record.transcript, summary: record.summary });
-  };
-
-  const handleViewSummary = (record: any) => {
-    setShowTranscriptionHistory(false);
-    setTranscript(record.transcript);
-    setSummary(record.summary);
-    setCurrentFile(new File([], record.fileName));
-    setProcessingState('completed');
-    setViewingRecord({ transcript: record.transcript, summary: record.summary });
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header with Logo */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="px-6 py-4 flex items-center">
-          <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-green-600 rounded-lg flex items-center justify-center mr-3">
-            <FileAudio className="w-5 h-5 text-white" />
-          </div>
-          <h1 className="text-xl font-semibold text-gray-900">Meeting Transcriber 1.1</h1>
-        </div>
-      </header>
-
-      {/* Menu Bar */}
-      <MenuBar 
-        onOpenSettings={() => setShowSettings(true)}
-        onShowAbout={() => setShowAbout(true)}
-        onShowExportPrefs={() => setShowExportPrefs(true)}
-        onShowUserGuide={() => setShowUserGuide(true)}
-        onShowTranscriptionHistory={() => setShowTranscriptionHistory(true)}
-        onShowActionTracker={() => setShowActionTracker(true)}
-        onReset={resetApp}
-        hasContent={!!(transcript || summary)}
-        onOpenFile={triggerFileSelect}
-        onExportTranscript={handleExportTranscript}
-        onExportSummary={handleExportSummary}
-      />
-
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col">
-        {processingState === 'idle' && (
-          <div className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
-            <AudioUpload onFileUpload={handleFileUpload} />
-          </div>
-        )}
-
-        {processingState === 'processing' && (
-          <div className="flex-1 flex items-center justify-center p-8">
-            <div className="max-w-md w-full">
-              <div className="text-center mb-8">
-                <RefreshCw className="w-16 h-16 text-green-500 mx-auto mb-4 animate-spin" />
-                <h2 className="text-2xl font-semibold text-gray-900 mb-2">Processing Audio</h2>
-                <p className="text-gray-600">{currentFile?.name}</p>
-                <p className="text-sm text-gray-500 mt-2">Please wait, this may take several minutes...</p>
-              </div>
-              <ProgressBar progressState={progressState} />
-              <div className="mt-6 text-center">
-                <button
-                  onClick={resetApp}
-                  className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancel Processing
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {processingState === 'error' && (
-          <div className="flex-1 flex items-center justify-center p-8">
-            <div className="max-w-md w-full text-center">
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <X className="w-8 h-8 text-red-600" />
-              </div>
-              <h2 className="text-2xl font-semibold text-gray-900 mb-2">Processing Failed</h2>
-              <div className="text-gray-600 mb-6">
-                <p className="mb-3">Critical processing error:</p>
-                <div className="bg-red-50 border border-red-200 rounded p-3 text-sm text-left">
-                  {processingError}
-                </div>
-                {processingError?.includes('CORS') && (
-                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-left">
-                    <p className="font-medium text-blue-800 mb-2">💡 Solution:</p>
-                    <p className="text-blue-700">
-                      You can continue testing the app functionality using mock data. 
-                      Simply upload an audio file without entering API keys to see how the transcription and summary features work.
-                    </p>
-                  </div>
-                )}
-              </div>
-              <div className="space-y-3">
-                <button
-                  onClick={resetApp}
-                  className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
-                >
-                  Try Again
-                </button>
-                {(processingError?.includes('OpenAI API quota exceeded') || processingError?.includes('429')) ? (
-                  <a
-                    href="https://platform.openai.com/usage"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full px-4 py-2 border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-50 transition-colors inline-block text-center"
-                  >
-                    Check OpenAI Usage & Billing
-                  </a>
-                ) : (processingError?.includes('Invalid OpenAI API key') || processingError?.includes('401')) ? (
-                  <button
-                    onClick={() => setShowSettings(true)}
-                    className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    Check API Settings
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {processingState === 'completed' && (
-          <div className="flex-1 flex">
-            {/* Split View */}
-            <div className="flex-1 flex">
-              <TranscriptPanel 
-                transcript={transcript} 
-                isLoading={processingState === 'processing'}
-                fileName={currentFile?.name || ''}
-              />
-              <SummaryPanel 
-                summary={summary} 
-                isLoading={processingState === 'processing'}
-                fileName={currentFile?.name || ''}
-              />
-            </div>
-          </div>
-        )}
-      </main>
-
-      {/* Settings Modal */}
-      {showSettings && (
-        <SettingsModal
-          apiKeys={apiKeys}
-          onSave={handleSaveAPIKeys}
-          onClose={() => setShowSettings(false)}
-        />
-      )}
-
-      {/* About Modal */}
-      {showAbout && (
-        <AboutModal onClose={() => setShowAbout(false)} />
-      )}
-
-      {/* Export Preferences Modal */}
-      {showExportPrefs && (
-        <ExportPreferencesModal
-          preferences={exportPreferences}
-          onSave={setExportPreferences}
-          onClose={() => setShowExportPrefs(false)}
-        />
-      )}
-
-      {/* User Guide Modal */}
-      {showUserGuide && (
-        <UserGuideModal
-          onClose={() => setShowUserGuide(false)}
-          onOpenSettings={() => setShowSettings(true)}
-        />
-      )}
-
-      {/* Transcription History Modal */}
-      {showTranscriptionHistory && (
-        <TranscriptionHistoryModal
-          onViewTranscription={handleViewTranscription}
-          onViewSummary={handleViewSummary}
-          onClose={() => setShowTranscriptionHistory(false)}
-        />
-      )}
-
-      {/* Action Tracker Modal */}
-      {showActionTracker && (
-        <ActionTrackerModal
-          onClose={() => setShowActionTracker(false)}
-        />
-      )}
-
-      {/* Hidden file input for menu trigger */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        className="hidden"
-        accept=".mp3,.wav,.aac,.m4a,.ogg,.webm"
-        onChange={handleFileInputChange}
-      />
-    </div>
-  );
+export interface ProgressCallback {
+  (phase: 'upload' | 'processing' | 'transcription' | 'summary', 
+   percentage: number, 
+   message: string, 
+   details?: { bytesUploaded?: number; totalBytes?: number; chunksReceived?: number; totalChunks?: number }): void;
 }
 
-export default App;
+interface UploadResponse {
+  uploadId: string;
+  storagePath: string;
+  fileSize: number;
+  fileName: string;
+}
+
+export class EdgeFunctionError extends Error {
+  constructor(message: string, public statusCode?: number) {
+    super(message);
+    this.name = 'EdgeFunctionError';
+  }
+
+  toStandardError(): StandardError {
+    return {
+      error: this.message,
+      statusCode: this.statusCode,
+      apiType: 'supabase',
+    };
+  }
+}
+
+export const uploadAudioToStorage = async (
+  file: File,
+  apiKey: string,
+  onProgress?: ProgressCallback
+): Promise<UploadResponse> => {
+  console.log('uploadAudioToStorage called with file:', file.name, 'size:', file.size);
+  
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    throw new EdgeFunctionError('Supabase connection not configured');
+  }
+
+  if (!apiKey || !apiKey.startsWith('sk-')) {
+    throw new EdgeFunctionError('Invalid OpenAI API key');
+  }
+
+  const apiUrl = `${SUPABASE_URL}/functions/v1/upload-audio`;
+  
+  onProgress?.('upload', 0, 'Uploading to Supabase Storage...', { totalBytes: file.size });
+  
+  try {
+    const response = await streamFileUpload(file, apiUrl, {
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'apiKey': apiKey
+      },
+      onProgress: (bytesUploaded, totalBytes) => {
+        const percentage = Math.round((bytesUploaded / totalBytes) * 100);
+        onProgress?.('upload', percentage, 'Uploading to storage...', {
+          bytesUploaded,
+          totalBytes
+        });
+      },
+      maxFileSize: 500 * 1024 * 1024,
+      timeout: 600000
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new EdgeFunctionError(errorData.error || 'Upload failed', response.status);
+    }
+    
+    const uploadResponse = await response.json() as UploadResponse;
+    onProgress?.('upload', 100, 'Upload complete!');
+    
+    return uploadResponse;
+    
+  } catch (error) {
+    if (error instanceof StreamError) {
+      if (error.code === 'FILE_TOO_LARGE') {
+        throw new EdgeFunctionError(error.message, 413);
+      } else if (error.code === 'NETWORK_ERROR') {
+        throw new RetryableError('Network error during upload', undefined);
+      } else if (error.code === 'TIMEOUT') {
+        throw new RetryableError('Upload timeout', undefined);
+      }
+      throw new EdgeFunctionError(error.message);
+    }
+    throw error;
+  }
+};
+
+export const transcribeWithStreaming = async (
+  uploadResponse: UploadResponse,
+  apiKey: string,
+  onProgress?: ProgressCallback,
+  onStreamingChunk?: (chunkData: any) => void
+): Promise<TranscriptData> => {
+  console.log('transcribeWithStreaming called for upload:', uploadResponse.uploadId);
+  
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    throw new EdgeFunctionError('Supabase connection not configured');
+  }
+
+  const apiUrl = `${SUPABASE_URL}/functions/v1/transcribe-chunked`;
+  
+  onProgress?.('processing', 0, 'Starting server-side transcription...', { isIndeterminate: true });
+  
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        uploadId: uploadResponse.uploadId,
+        storagePath: uploadResponse.storagePath,
+        apiKey: apiKey,
+        chunkSize: 300, // 5 minutes per chunk
+        maxChunkSize: 25 * 1024 * 1024 // 25MB max chunk size
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new EdgeFunctionError(errorData.error || 'Transcription failed', response.status);
+    }
+
+    onProgress?.('transcription', 75, 'Processing transcription chunks...');
+    
+    const transcriptData = await response.json();
+    
+    return transcriptData as TranscriptData;
+    
+  } catch (error) {
+    console.error('Error in streaming transcription:', error);
+    
+    if (error instanceof EdgeFunctionError) {
+      throw error;
+    }
+    
+    throw new EdgeFunctionError(`Streaming transcription failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+};
+
+export const transcribeAudioViaEdgeFunction = async (
+  file: File, 
+  apiKey: string, 
+  onProgress?: ProgressCallback
+): Promise<TranscriptData> => {
+  console.log('transcribeAudioViaEdgeFunction called with file:', file.name, 'size:', file.size);
+  
+  // Validate file without loading into memory
+  const validation = await validateFileStream(file);
+  if (!validation.isValid) {
+    throw new EdgeFunctionError(validation.error || 'File validation failed');
+  }
+  
+  console.log('File validation passed:', validation.fileInfo);
+  
+  if (!SUPABASE_URL) {
+    throw new EdgeFunctionError('Supabase URL not configured. Please click "Connect to Supabase" in the top right to set up your Supabase connection.');
+  }
+
+  if (!SUPABASE_ANON_KEY) {
+    throw new EdgeFunctionError('Supabase anonymous key not configured. Please set up your Supabase connection.');
+  }
+
+  if (!apiKey || !apiKey.startsWith('sk-')) {
+    throw new EdgeFunctionError('Invalid OpenAI API key. Key should start with "sk-"');
+  }
+
+  // Log file size for processing
+  console.log(`Processing file: ${file.name} (${Math.round(file.size / 1024 / 1024)}MB)`);
+  
+  const apiUrl = `${SUPABASE_URL}/functions/v1/transcribe-audio`;
+  
+  console.log('Sending request to edge function:', apiUrl);
+  
+  // Initialize progress
+  onProgress?.('upload', 0, 'Preparing streamed upload...', { totalBytes: file.size });
+  
+  // Use retry logic with exponential backoff
+  return retryWithBackoff(async () => {
+    try {
+      // Use streamed upload instead of loading entire file into memory
+      const response = await streamFileUpload(file, apiUrl, {
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'apiKey': apiKey
+        },
+        onProgress: (bytesUploaded, totalBytes) => {
+          const percentage = Math.round((bytesUploaded / totalBytes) * 100);
+          onProgress?.('upload', percentage, 'Streaming audio file...', {
+            bytesUploaded,
+            totalBytes
+          });
+        },
+        maxFileSize: 500 * 1024 * 1024, // 500MB limit
+        timeout: 600000 // 10 minutes
+      });
+      
+      // Upload complete, now processing
+      onProgress?.('processing', 0, 'Upload complete, processing on server...', { isIndeterminate: true });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('Edge function error response:', errorData);
+        
+        if (response.status === 401) {
+          throw new EdgeFunctionError('Invalid OpenAI API key. Please check your API key in Settings.', 401);
+        } else if (response.status === 413) {
+          throw new EdgeFunctionError('File too large. Please try with a smaller audio file.', 413);
+        } else {
+          // Create retryable error for 429/5xx
+          const error = new RetryableError(
+            errorData.error || 'Edge function error occurred',
+            response.status,
+            response.headers.get('Retry-After') ? parseInt(response.headers.get('Retry-After')!) * 1000 : undefined
+          );
+          throw error;
+        }
+      }
+      
+      onProgress?.('transcription', 50, 'Transcribing audio with OpenAI Whisper...');
+      
+      const transcriptData = await response.json();
+      console.log('Transcription completed via edge function:', transcriptData);
+      
+      onProgress?.('transcription', 100, 'Transcription complete!');
+      return transcriptData as TranscriptData;
+      
+    } catch (error) {
+      if (error instanceof StreamError) {
+        if (error.code === 'FILE_TOO_LARGE') {
+          throw new EdgeFunctionError(error.message, 413);
+        } else if (error.code === 'NETWORK_ERROR') {
+          throw new RetryableError('Network error during upload', undefined);
+        } else if (error.code === 'TIMEOUT') {
+          throw new RetryableError('Upload timeout', undefined);
+        }
+        throw new EdgeFunctionError(error.message);
+      }
+      throw error;
+    }
+  }, {
+    maxRetries: 3,
+    baseDelay: 1000,
+    maxDelay: 30000,
+    retryableStatusCodes: [429, 500, 502, 503, 504],
+    onRetry: (attempt, delay, error) => {
+      console.log(`Transcription retry attempt ${attempt}, waiting ${delay}ms:`, error.message);
+      onProgress?.('upload', 0, `Retry attempt ${attempt}/4`, { 
+        isIndeterminate: true,
+        retryAttempt: attempt
+      });
+    },
+    onCountdown: (remainingSeconds) => {
+      onProgress?.('upload', 0, `Retrying in ${remainingSeconds} seconds...`, { 
+        isIndeterminate: true,
+        retryCountdown: remainingSeconds
+      });
+    }
+  });
+  
+  /* Original fetch-based implementation - keeping as fallback
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+      body: formData,
+    });
+
+    console.log('Edge function response status:', response.status);
+    console.log('Edge function response headers:', Object.fromEntries(response.headers.entries()));
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      console.error('Edge function error response:', errorData);
+      
+      if (response.status === 401) {
+        throw new EdgeFunctionError('Invalid OpenAI API key. Please check your API key in Settings.', 401);
+      }
+      
+      if (response.status === 413) {
+        throw new EdgeFunctionError('File too large. Please try with a smaller audio file.', 413);
+      }
+      
+      throw new EdgeFunctionError(
+        errorData.error || 'Edge function error occurred',
+        response.status
+      );
+    }
+
+    const transcriptData = await response.json();
+    console.log('Transcription completed via edge function:', transcriptData);
+    
+    return transcriptData as TranscriptData;
+  } catch (error) {
+    console.error('Error calling transcription edge function:', error);
+    
+    if (error instanceof EdgeFunctionError) {
+      throw error;
+    }
+    
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      throw new EdgeFunctionError('Network error: Unable to connect to Supabase edge function. Please check your Supabase connection and try again.');
+    }
+    
+    throw new EdgeFunctionError(`Failed to transcribe audio: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+  */
+};
+
+export const generateSummaryViaEdgeFunction = async (
+  transcript: TranscriptData, 
+  apiKey: string, 
+  onProgress?: ProgressCallback
+): Promise<SummaryData> => {
+  console.log('generateSummaryViaEdgeFunction called');
+  
+  if (!SUPABASE_URL) {
+    throw new EdgeFunctionError('Supabase URL not configured. Please click "Connect to Supabase" in the top right to set up your Supabase connection.');
+  }
+
+  if (!SUPABASE_ANON_KEY) {
+    throw new EdgeFunctionError('Supabase anonymous key not configured. Please set up your Supabase connection.');
+  }
+
+  if (!apiKey || !apiKey.startsWith('sk-')) {
+    throw new EdgeFunctionError('Invalid OpenAI API key for summary generation');
+  }
+
+  if (!transcript || !transcript.speakers || transcript.speakers.length === 0) {
+    throw new EdgeFunctionError('Invalid transcript data for summary generation');
+  }
+
+  onProgress?.('summary', 0, 'Generating summary with GPT...');
+  
+  const apiUrl = `${SUPABASE_URL}/functions/v1/generate-summary`;
+  
+  console.log('Sending summary request to edge function:', apiUrl);
+
+  try {
+    onProgress?.('summary', 25, 'Sending transcript to AI...');
+    
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        transcript,
+        apiKey,
+      }),
+    });
+
+    console.log('Summary edge function response status:', response.status);
+    onProgress?.('summary', 75, 'Processing AI response...');
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      console.error('Summary edge function error:', errorData);
+      
+      if (response.status === 401) {
+        throw new EdgeFunctionError('Invalid OpenAI API key. Please check your API key in Settings.', 401);
+      }
+      
+      throw new EdgeFunctionError(
+        errorData.error || 'Summary generation error occurred',
+        response.status
+      );
+    }
+
+    const summaryData = await response.json();
+    console.log('Summary completed via edge function:', summaryData);
+    
+    onProgress?.('summary', 100, 'Summary generation complete!');
+    return summaryData as SummaryData;
+  } catch (error) {
+    console.error('Error calling summary edge function:', error);
+    
+    if (error instanceof EdgeFunctionError) {
+      throw error;
+    }
+    
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      throw new EdgeFunctionError('Network error: Unable to connect to Supabase edge function. Please check your Supabase connection and try again.');
+    }
+    
+    throw new EdgeFunctionError(`Failed to generate summary: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+};
+
+export const checkSupabaseConnection = (): boolean => {
+  // Check if environment variables exist and aren't placeholder values
+  const hasUrl = SUPABASE_URL && 
+    SUPABASE_URL !== 'your_supabase_project_url' && 
+    SUPABASE_URL !== 'undefined' &&
+    SUPABASE_URL !== 'null' &&
+    !SUPABASE_URL.includes('your_') &&
+    !SUPABASE_URL.includes('placeholder') &&
+    SUPABASE_URL.startsWith('https://');
+  
+  const hasKey = SUPABASE_ANON_KEY && 
+    SUPABASE_ANON_KEY !== 'your_supabase_anon_key' && 
+    SUPABASE_ANON_KEY !== 'undefined' &&
+    SUPABASE_ANON_KEY !== 'null' &&
+    !SUPABASE_ANON_KEY.includes('your_') &&
+    !SUPABASE_ANON_KEY.includes('placeholder') &&
+    SUPABASE_ANON_KEY.startsWith('eyJ');
+  
+  return !!(hasUrl && hasKey);
+};
