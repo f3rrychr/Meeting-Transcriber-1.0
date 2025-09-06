@@ -13,6 +13,13 @@ export interface ProgressCallback {
    details?: { bytesUploaded?: number; totalBytes?: number; chunksReceived?: number; totalChunks?: number }): void;
 }
 
+interface UploadResponse {
+  uploadId: string;
+  storagePath: string;
+  fileSize: number;
+  fileName: string;
+}
+
 export class EdgeFunctionError extends Error {
   constructor(message: string, public statusCode?: number) {
     super(message);
@@ -28,6 +35,107 @@ export class EdgeFunctionError extends Error {
   }
 }
 
+export const uploadAudioToStorage = async (
+  file: File,
+  apiKey: string,
+  onProgress?: ProgressCallback
+): Promise<UploadResponse> => {
+  console.log('uploadAudioToStorage called with file:', file.name, 'size:', file.size);
+  
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    throw new EdgeFunctionError('Supabase connection not configured');
+  }
+
+  if (!apiKey || !apiKey.startsWith('sk-')) {
+    throw new EdgeFunctionError('Invalid OpenAI API key');
+  }
+
+  const apiUrl = `${SUPABASE_URL}/functions/v1/upload-audio`;
+  
+  onProgress?.('upload', 0, 'Uploading to Supabase Storage...', { totalBytes: file.size });
+  
+  try {
+    const response = await streamFileUpload(file, apiUrl, {
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'apiKey': apiKey
+      },
+      onProgress: (bytesUploaded, totalBytes) => {
+        const percentage = Math.round((bytesUploaded / totalBytes) * 100);
+        onProgress?.('upload', percentage, 'Uploading to storage...', {
+          bytesUploaded,
+          totalBytes
+        });
+      },
+      maxFileSize: 500 * 1024 * 1024,
+      timeout: 600000
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new EdgeFunctionError(errorData.error || 'Upload failed', response.status);
+    }
+    
+    const uploadResponse = await response.json() as UploadResponse;
+    onProgress?.('upload', 100, 'Upload complete!');
+    
+    return uploadResponse;
+    
+  } catch (error) {
+    if (error instanceof StreamError) {
+      if (error.code === 'FILE_TOO_LARGE') {
+        throw new EdgeFunctionError(error.message, 413);
+      } else if (error.code === 'NETWORK_ERROR') {
+        throw new RetryableError('Network error during upload', undefined);
+      } else if (error.code === 'TIMEOUT') {
+        throw new RetryableError('Upload timeout', undefined);
+      }
+      throw new EdgeFunctionError(error.message);
+    }
+    throw error;
+  }
+};
+
+export const transcribeFromStorage = async (
+  uploadResponse: UploadResponse,
+  apiKey: string,
+  onProgress?: ProgressCallback
+): Promise<TranscriptData> => {
+  console.log('transcribeFromStorage called for upload:', uploadResponse.uploadId);
+  
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    throw new EdgeFunctionError('Supabase connection not configured');
+  }
+
+  const apiUrl = `${SUPABASE_URL}/functions/v1/transcribe-chunked`;
+  
+  onProgress?.('processing', 0, 'Starting server-side transcription...', { isIndeterminate: true });
+  
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        uploadId: uploadResponse.uploadId,
+        storagePath: uploadResponse.storagePath,
+        apiKey: apiKey,
+        chunkSize: 300, // 5 minutes per chunk
+        maxChunkSize: 25 * 1024 * 1024 // 25MB max chunk size
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new EdgeFunctionError(errorData.error || 'Transcription failed', response.status);
+    }
+
+    onProgress?.('transcription', 75, 'Processing transcription chunks...');
+    
+    const transcriptData = await response.json();
+    
 export const transcribeAudioViaEdgeFunction = async (
   file: File, 
   apiKey: string, 
