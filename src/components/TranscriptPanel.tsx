@@ -136,11 +136,8 @@ export const transcribeFromStorage = async (
     
     const transcriptData = await response.json();
     
-    onProgress?.('transcription', 100, 'Transcription complete!');
-    return transcriptData as TranscriptData;
-    
+    return transcriptData;
   } catch (error) {
-    console.error('Error in transcribeFromStorage:', error);
     throw error;
   }
 };
