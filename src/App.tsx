@@ -96,13 +96,12 @@ export const uploadAudioToStorage = async (
   }
 };
 
-export const transcribeWithStreaming = async (
+export const transcribeFromStorage = async (
   uploadResponse: UploadResponse,
   apiKey: string,
-  onProgress?: ProgressCallback,
-  onStreamingChunk?: (chunkData: any) => void
+  onProgress?: ProgressCallback
 ): Promise<TranscriptData> => {
-  console.log('transcribeWithStreaming called for upload:', uploadResponse.uploadId);
+  console.log('transcribeFromStorage called for upload:', uploadResponse.uploadId);
   
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     throw new EdgeFunctionError('Supabase connection not configured');
@@ -137,16 +136,12 @@ export const transcribeWithStreaming = async (
     
     const transcriptData = await response.json();
     
+    onProgress?.('transcription', 100, 'Transcription complete!');
     return transcriptData as TranscriptData;
     
   } catch (error) {
-    console.error('Error in streaming transcription:', error);
-    
-    if (error instanceof EdgeFunctionError) {
-      throw error;
-    }
-    
-    throw new EdgeFunctionError(`Streaming transcription failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    console.error('Error in transcribeFromStorage:', error);
+    throw error;
   }
 };
 

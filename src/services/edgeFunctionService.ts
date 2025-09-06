@@ -136,6 +136,15 @@ export const transcribeFromStorage = async (
     
     const transcriptData = await response.json();
     
+    onProgress?.('transcription', 100, 'Transcription complete!');
+    return transcriptData as TranscriptData;
+    
+  } catch (error) {
+    console.error('Error in transcribeFromStorage:', error);
+    throw error;
+  }
+};
+
 export const transcribeAudioViaEdgeFunction = async (
   file: File, 
   apiKey: string, 
