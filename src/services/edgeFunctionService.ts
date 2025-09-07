@@ -143,6 +143,24 @@ export const transcribeFromStorage = async (
     
     const transcriptData = await response.json();
     
+    onProgress?.('transcription', 100, 'Transcription complete!');
+    return transcriptData as TranscriptData;
+    
+  } catch (error) {
+    console.error('Error in transcribeFromStorage:', error);
+    
+    if (error instanceof EdgeFunctionError) {
+      throw error;
+    }
+    
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      throw new EdgeFunctionError('Network error: Unable to connect to Supabase edge function. Please check your Supabase connection and try again.');
+    }
+    
+    throw new EdgeFunctionError(`Failed to transcribe from storage: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+};
+
 export const uploadAudioToStorage = async (
   file: File,
   apiKey: string,
@@ -244,6 +262,110 @@ export const transcribeFromStorage = async (
     
     const transcriptData = await response.json();
     
+    onProgress?.('transcription', 100, 'Transcription complete!');
+    return transcriptData as TranscriptData;
+    
+  } catch (error) {
+    console.error('Error in transcribeFromStorage:', error);
+    
+    if (error instanceof EdgeFunctionError) {
+      throw error;
+    }
+    
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      throw new EdgeFunctionError('Network error: Unable to connect to Supabase edge function. Please check your Supabase connection and try again.');
+    }
+    
+    throw new EdgeFunctionError(`Failed to transcribe from storage: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+};
+
+export const streamTranscribeFromStorage = async (
+  uploadResponse: UploadResponse,
+  apiKey: string,
+  onProgress?: ProgressCallback
+): Promise<TranscriptData> => {
+  console.log('streamTranscribeFromStorage called for upload:', uploadResponse.uploadId);
+  
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    throw new EdgeFunctionError('Supabase connection not configured');
+  }
+
+  const apiUrl = `${SUPABASE_URL}/functions/v1/transcribe-stream`;
+  
+  onProgress?.('processing', 0, 'Starting streaming transcription...', { isIndeterminate: true });
+  
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        uploadId: uploadResponse.uploadId,
+        storagePath: uploadResponse.storagePath,
+        apiKey: apiKey,
+        chunkSize: 300, // 5 minutes per chunk
+        maxChunkSize: 25 * 1024 * 1024 // 25MB max chunk size
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new EdgeFunctionError(errorData.error || 'Streaming transcription failed', response.status);
+    }
+
+    if (!response.body) {
+      throw new EdgeFunctionError('No response body for streaming transcription');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let finalTranscript: TranscriptData | null = null;
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) break;
+        
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        
+        for (const line of lines) {
+          if (line.trim() === '') continue;
+          
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            
+            if (data === '[DONE]') {
+              console.log('Streaming transcription completed');
+              break;
+            }
+            
+            try {
+              const eventData = JSON.parse(data);
+              
+              switch (eventData.type) {
+                case 'progress':
+                  onProgress?.('transcription', eventData.data.percentage, eventData.data.message, {
+                    chunksReceived: eventData.data.chunksReceived,
+                    totalChunks: eventData.data.totalChunks
+                  });
+                  break;
+                  
+                case 'chunk_complete':
+                  console.log(`Chunk ${eventData.data.chunkIndex + 1} completed`);
+                  break;
+                  
+                case 'complete':
+                  finalTranscript = eventData.data.transcript;
+                  onProgress?.('transcription', 100, 'Streaming transcription complete!');
+                  break;
+                  
                 case 'error':
                   throw new EdgeFunctionError(eventData.data.error || 'Streaming transcription error');
               }
