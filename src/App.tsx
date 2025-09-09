@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Upload, FileAudio, Settings, Download, Copy, Play, Pause, RefreshCw, X } from 'lucide-react';
+import { Upload, FileAudio, Settings, Download, Copy, Play, Pause, RefreshCw, X, Calendar } from 'lucide-react';
 import MenuBar from './components/MenuBar';
 import TranscriptPanel from './components/TranscriptPanel';
 import SummaryPanel from './components/SummaryPanel';
@@ -19,6 +19,7 @@ import { transcribeAudioViaEdgeFunction, generateSummaryViaEdgeFunction, EdgeFun
 import { transcribeAudioSegmented, shouldUseSegmentedTranscription, SegmentedTranscriptionError } from './services/segmentedTranscriptionService';
 import { AudioProcessor } from './utils/audioUtils';
 import { ResumableUploadService } from './services/resumableUploadService';
+import MeetingsFeature from './features/meetings';
 
 // Get limits from environment variables with fallbacks
 const getFileSizeLimit = (): number => {
@@ -64,6 +65,7 @@ function App() {
     TranscriptionStorage.initialize();
   }, []);
 
+  const [currentFeature, setCurrentFeature] = useState<'transcriber' | 'meetings'>('transcriber');
   const [processingState, setProcessingState] = useState<ProcessingState>('idle');
   const [progressState, setProgressState] = useState<ProgressState>({
     stage: 'validating',
@@ -640,6 +642,14 @@ function App() {
     setViewingRecord({ transcript: record.transcript, summary: record.summary });
   };
 
+  const handleShowMeetings = () => {
+    setCurrentFeature('meetings');
+  };
+
+  const handleShowTranscriber = () => {
+    setCurrentFeature('transcriber');
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header with Logo */}
@@ -649,125 +659,158 @@ function App() {
             <FileAudio className="w-5 h-5 text-white" />
           </div>
           <h1 className="text-xl font-semibold text-gray-900">Meeting Transcriber 1.1</h1>
+          
+          {/* Feature Navigation */}
+          <div className="ml-8 flex items-center space-x-1">
+            <button
+              onClick={handleShowTranscriber}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                currentFeature === 'transcriber'
+                  ? 'bg-green-100 text-green-700'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+              }`}
+            >
+              <FileAudio className="w-4 h-4 mr-2 inline" />
+              Transcriber
+            </button>
+            <button
+              onClick={handleShowMeetings}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                currentFeature === 'meetings'
+                  ? 'bg-green-100 text-green-700'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+              }`}
+            >
+              <Calendar className="w-4 h-4 mr-2 inline" />
+              Meetings
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* Menu Bar */}
-      <MenuBar 
-        onOpenSettings={() => setShowSettings(true)}
-        onShowAbout={() => setShowAbout(true)}
-        onShowExportPrefs={() => setShowExportPrefs(true)}
-        onShowUserGuide={() => setShowUserGuide(true)}
-        onShowTranscriptionHistory={() => setShowTranscriptionHistory(true)}
-        onShowActionTracker={() => setShowActionTracker(true)}
-        onReset={resetApp}
-        hasContent={!!(transcript || summary)}
-        onOpenFile={triggerFileSelect}
-        onExportTranscript={handleExportTranscript}
-        onExportSummary={handleExportSummary}
-      />
+      {/* Conditional Feature Rendering */}
+      {currentFeature === 'meetings' ? (
+        <MeetingsFeature />
+      ) : (
+        <>
+          {/* Menu Bar */}
+          <MenuBar 
+            onOpenSettings={() => setShowSettings(true)}
+            onShowAbout={() => setShowAbout(true)}
+            onShowExportPrefs={() => setShowExportPrefs(true)}
+            onShowUserGuide={() => setShowUserGuide(true)}
+            onShowTranscriptionHistory={() => setShowTranscriptionHistory(true)}
+            onShowActionTracker={() => setShowActionTracker(true)}
+            onReset={resetApp}
+            hasContent={!!(transcript || summary)}
+            onOpenFile={triggerFileSelect}
+            onExportTranscript={handleExportTranscript}
+            onExportSummary={handleExportSummary}
+          />
 
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col">
-        {processingState === 'idle' && (
-          <div className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
-            <AudioUpload onFileUpload={handleFileUpload} />
-          </div>
-        )}
+          {/* Main Content */}
+          <main className="flex-1 flex flex-col">
+            {processingState === 'idle' && (
+              <div className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
+                <AudioUpload onFileUpload={handleFileUpload} />
+              </div>
+            )}
 
-        {processingState === 'processing' && (
-          <div className="flex-1 flex items-center justify-center p-8">
-            <div className="max-w-md w-full">
-              <div className="text-center mb-8">
-                <RefreshCw className="w-16 h-16 text-green-500 mx-auto mb-4 animate-spin" />
-                <h2 className="text-2xl font-semibold text-gray-900 mb-2">Processing Audio</h2>
-                <p className="text-gray-600">{currentFile?.name}</p>
-                <p className="text-sm text-gray-500 mt-2">Please wait, this may take several minutes...</p>
-              </div>
-              <ProgressBar progressState={progressState} />
-              <div className="mt-6 text-center">
-                <button
-                  onClick={resetApp}
-                  className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancel Processing
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {processingState === 'error' && (
-          <div className="flex-1 flex items-center justify-center p-8">
-            <div className="max-w-md w-full text-center">
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <X className="w-8 h-8 text-red-500" />
-              </div>
-              <h2 className="text-2xl font-semibold text-gray-900 mb-2">Processing Failed</h2>
-              <div className="text-gray-600 mb-6">
-                <p className="mb-3">Critical processing error:</p>
-                <div className="bg-red-50 border border-red-200 rounded p-3 text-sm text-left">
-                  {processingError}
-                </div>
-                {processingError?.includes('CORS') && (
-                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-left">
-                    <p className="font-medium text-blue-800 mb-2">💡 Solution:</p>
-                    <p className="text-blue-700">
-                      You can continue testing the app functionality using mock data. 
-                      Simply upload an audio file without entering API keys to see how the transcription and summary features work.
-                    </p>
+            {processingState === 'processing' && (
+              <div className="flex-1 flex items-center justify-center p-8">
+                <div className="max-w-md w-full">
+                  <div className="text-center mb-8">
+                    <RefreshCw className="w-16 h-16 text-green-500 mx-auto mb-4 animate-spin" />
+                    <h2 className="text-2xl font-semibold text-gray-900 mb-2">Processing Audio</h2>
+                    <p className="text-gray-600">{currentFile?.name}</p>
+                    <p className="text-sm text-gray-500 mt-2">Please wait, this may take several minutes...</p>
                   </div>
-                )}
+                  <ProgressBar progressState={progressState} />
+                  <div className="mt-6 text-center">
+                    <button
+                      onClick={resetApp}
+                      className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel Processing
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div className="space-y-3">
-                <button
-                  onClick={resetApp}
-                  className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
-                >
-                  Try Again
-                </button>
-                {(processingError?.includes('OpenAI API quota exceeded') || processingError?.includes('429')) ? (
-                  <a
-                    href="https://platform.openai.com/usage"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full px-4 py-2 border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-50 transition-colors inline-block text-center"
-                  >
-                    Check OpenAI Usage & Billing
-                  </a>
-                ) : (processingError?.includes('Invalid OpenAI API key') || processingError?.includes('401')) ? (
-                  <button
-                    onClick={() => setShowSettings(true)}
-                    className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    Check API Settings
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          </div>
-        )}
+            )}
 
-        {processingState === 'completed' && (
-          <div className="flex-1 flex">
-            {/* Split View */}
-            <div className="flex-1 flex">
-              <TranscriptPanel 
-                transcript={transcript} 
-                isLoading={processingState === 'processing'}
-                fileName={currentFile?.name || ''}
-                isStreaming={isStreaming}
-                streamingSegments={streamingSegments}
-              />
-              <SummaryPanel 
-                summary={summary} 
-                isLoading={processingState === 'processing'}
-                fileName={currentFile?.name || ''}
-              />
-            </div>
-          </div>
-        )}
-      </main>
+            {processingState === 'error' && (
+              <div className="flex-1 flex items-center justify-center p-8">
+                <div className="max-w-md w-full text-center">
+                  <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <X className="w-8 h-8 text-red-500" />
+                  </div>
+                  <h2 className="text-2xl font-semibold text-gray-900 mb-2">Processing Failed</h2>
+                  <div className="text-gray-600 mb-6">
+                    <p className="mb-3">Critical processing error:</p>
+                    <div className="bg-red-50 border border-red-200 rounded p-3 text-sm text-left">
+                      {processingError}
+                    </div>
+                    {processingError?.includes('CORS') && (
+                      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-left">
+                        <p className="font-medium text-blue-800 mb-2">💡 Solution:</p>
+                        <p className="text-blue-700">
+                          You can continue testing the app functionality using mock data. 
+                          Simply upload an audio file without entering API keys to see how the transcription and summary features work.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-3">
+                    <button
+                      onClick={resetApp}
+                      className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                    >
+                      Try Again
+                    </button>
+                    {(processingError?.includes('OpenAI API quota exceeded') || processingError?.includes('429')) ? (
+                      <a
+                        href="https://platform.openai.com/usage"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full px-4 py-2 border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-50 transition-colors inline-block text-center"
+                      >
+                        Check OpenAI Usage & Billing
+                      </a>
+                    ) : (processingError?.includes('Invalid OpenAI API key') || processingError?.includes('401')) ? (
+                      <button
+                        onClick={() => setShowSettings(true)}
+                        className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        Check API Settings
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {processingState === 'completed' && (
+              <div className="flex-1 flex">
+                {/* Split View */}
+                <div className="flex-1 flex">
+                  <TranscriptPanel 
+                    transcript={transcript} 
+                    isLoading={processingState === 'processing'}
+                    fileName={currentFile?.name || ''}
+                    isStreaming={isStreaming}
+                    streamingSegments={streamingSegments}
+                  />
+                  <SummaryPanel 
+                    summary={summary} 
+                    isLoading={processingState === 'processing'}
+                    fileName={currentFile?.name || ''}
+                  />
+                </div>
+              </div>
+            )}
+          </main>
+        </>
+      )}
 
       {/* Settings Modal */}
       {showSettings && (
@@ -817,13 +860,15 @@ function App() {
       )}
 
       {/* Hidden file input for menu trigger */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        className="hidden"
-        accept=".mp3,.wav,.aac,.m4a,.ogg,.webm"
-        onChange={handleFileInputChange}
-      />
+      {currentFeature === 'transcriber' && (
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          accept=".mp3,.wav,.aac,.m4a,.ogg,.webm"
+          onChange={handleFileInputChange}
+        />
+      )}
     </div>
   );
 }

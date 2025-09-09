@@ -90,6 +90,23 @@ export interface StandardError {
   apiType?: 'openai' | 'huggingface' | 'supabase';
 }
 
+// Meeting-related types
+export interface TranscriptionRecord {
+  id: string;
+  date: string;
+  title: string;
+  transcript: TranscriptData;
+  summary: SummaryData;
+  fileName: string;
+  createdAt: number;
+}
+
+// API Keys interface
+export interface ApiKeys {
+  openai: string;
+  huggingface: string;
+}
+
 // Progress state interface for detailed progress tracking
 export interface ProgressState {
   stage: 'validating' | 'compressing' | 'uploading' | 'transcribing' | 'summarizing' | 'saving' | 'complete';
