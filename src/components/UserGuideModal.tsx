@@ -43,8 +43,8 @@ const UserGuideModal: React.FC<UserGuideModalProps> = ({ onClose, onOpenSettings
           <div className="mb-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-3">Getting Started</h3>
             <p className="text-gray-600 mb-4">
-              Welcome to Meeting Transcriber! To use this application, you need to configure your API keys first. 
-              Follow these simple steps to get started:
+              Welcome to Meeting Transcriber! This application requires both Supabase connection and OpenAI API key for real transcription. 
+              Follow these steps to get started:
             </p>
           </div>
 
@@ -57,24 +57,24 @@ const UserGuideModal: React.FC<UserGuideModalProps> = ({ onClose, onOpenSettings
               <div className="flex-1">
                 <h4 className="font-semibold text-gray-900 mb-2 flex items-center">
                   <Key className="w-4 h-4 mr-2" />
-                  Configure API Keys
+                  Setup Required Services
                 </h4>
                 <p className="text-gray-600 mb-3">
-                  You need two API keys to use all features of the application:
+                  You need to set up Supabase and get an OpenAI API key:
                 </p>
                 <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                  <div>
+                    <h5 className="font-medium text-gray-800">Supabase Connection</h5>
+                    <p className="text-sm text-gray-600">Required for secure server-side processing</p>
+                    <p className="text-sm text-blue-600">
+                      Click "Connect to Supabase" in the top right corner
+                    </p>
+                  </div>
                   <div>
                     <h5 className="font-medium text-gray-800">OpenAI API Key</h5>
                     <p className="text-sm text-gray-600">Used for audio transcription and text summarization</p>
                     <p className="text-sm text-blue-600">
                       Get it from: <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="underline">platform.openai.com/api-keys</a>
-                    </p>
-                  </div>
-                  <div>
-                    <h5 className="font-medium text-gray-800">Hugging Face API Token</h5>
-                    <p className="text-sm text-gray-600">Used for speaker identification (who said what)</p>
-                    <p className="text-sm text-blue-600">
-                      Get it from: <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener noreferrer" className="underline">huggingface.co/settings/tokens</a>
                     </p>
                   </div>
                 </div>
@@ -105,6 +105,7 @@ const UserGuideModal: React.FC<UserGuideModalProps> = ({ onClose, onOpenSettings
                   <li>• Supported formats: MP3, WAV, AAC, M4A, OGG, WebM</li>
                   <li>• Maximum file size: {Math.round(getFileSizeLimit() / 1024 / 1024)}MB (≈{Math.round(getDurationLimit() / 60)} hours)</li>
                   <li>• Drag & drop or click "Choose Audio File"</li>
+                  <li>• Large files (>50MB) use resumable uploads automatically</li>
                 </ul>
               </div>
             </div>
@@ -122,9 +123,10 @@ const UserGuideModal: React.FC<UserGuideModalProps> = ({ onClose, onOpenSettings
                   The app will automatically:
                 </p>
                 <ul className="text-sm text-gray-600 space-y-1 ml-4">
-                  <li>• Transcribe the audio with speaker identification</li>
+                  <li>• Transcribe the audio using OpenAI Whisper</li>
                   <li>• Generate a summary with key points and action items</li>
                   <li>• Allow you to export both transcript and summary</li>
+                  <li>• Store results locally for future reference</li>
                 </ul>
               </div>
             </div>
@@ -134,8 +136,9 @@ const UserGuideModal: React.FC<UserGuideModalProps> = ({ onClose, onOpenSettings
             <h4 className="font-medium text-blue-900 mb-2">💡 Pro Tips</h4>
             <ul className="text-sm text-blue-800 space-y-1">
               <li>• For best results, use clear audio recordings with minimal background noise</li>
-              <li>• The app works better when speakers take turns rather than talking over each other</li>
+              <li>• Long files (>100MB) are automatically processed in segments for better performance</li>
               <li>• You can customize export preferences in Settings → Export Preferences</li>
+              <li>• All processing happens securely through Supabase edge functions</li>
             </ul>
           </div>
         </div>

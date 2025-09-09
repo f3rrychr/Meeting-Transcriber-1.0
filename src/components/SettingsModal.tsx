@@ -82,10 +82,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ apiKeys, onSave, onClose 
           {/* Supabase Connection Status */}
           <ConnectionStatus />
 
-          {/* OpenAI API Key */}
+          {/* OpenAI API Key - Required */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              OpenAI API Key
+              OpenAI API Key (Required)
             </label>
             <div className="relative">
               <input
@@ -113,10 +113,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ apiKeys, onSave, onClose 
             </p>
           </div>
 
-          {/* Hugging Face API Token */}
+          {/* Hugging Face API Token - Optional/Deprecated */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Hugging Face API Token
+              Hugging Face API Token (Optional - Not Currently Used)
             </label>
             <div className="relative">
               <input
@@ -140,7 +140,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ apiKeys, onSave, onClose 
               <p className="mt-2 text-sm text-red-600">{errors.huggingface}</p>
             )}
             <p className="mt-1 text-sm text-gray-500">
-              Used for speaker diarization (speaker identification)
+              Reserved for future speaker diarization features
             </p>
           </div>
 
@@ -168,8 +168,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ apiKeys, onSave, onClose 
                 <h4 className="font-medium text-amber-900 mb-1">Important Notes</h4>
                 <div className="text-sm text-amber-800 space-y-1">
                   <p>• API keys are stored locally in your browser</p>
-                  <p>• Both keys are required for full functionality</p>
+                  <p>• OpenAI API key is required for transcription and summarization</p>
+                  <p>• Supabase connection is required for secure processing</p>
                   <p>• API usage will be charged to your accounts</p>
+                  <p>• All processing happens through secure edge functions</p>
                 </div>
               </div>
             </div>
