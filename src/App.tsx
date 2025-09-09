@@ -18,6 +18,17 @@ import { transcribeAudio, diarizeSpeakers, generateSummary, validateAPIKeys, API
 import { transcribeAudioViaEdgeFunction, generateSummaryViaEdgeFunction, EdgeFunctionError, checkSupabaseConnection, uploadAudioToStorage, streamTranscribeFromStorage } from './services/edgeFunctionService';
 import { AudioProcessor } from './utils/audioUtils';
 
+// Get limits from environment variables with fallbacks
+const getFileSizeLimit = (): number => {
+  const envLimit = import.meta.env.VITE_MAX_FILE_SIZE_MB;
+  return envLimit ? parseInt(envLimit) * 1024 * 1024 : 500 * 1024 * 1024; // Default 500MB
+};
+
+const getDurationLimit = (): number => {
+  const envLimit = import.meta.env.VITE_MAX_DURATION_MINUTES;
+  return envLimit ? parseInt(envLimit) : 180; // Default 180 minutes (3 hours)
+};
+
 // Local storage keys
 const STORAGE_KEYS = {
   API_KEYS: 'meeting-transcriber-api-keys'
@@ -246,11 +257,11 @@ function App() {
       setIsStreaming(false);
       
       if (error instanceof APIError || error instanceof EdgeFunctionError) {
-        const standardError = error instanceof APIError ? error.toStandardError() : error.toStandardError();
-        setProcessingError(`${standardError.apiType?.toUpperCase() || 'API'} Error: ${standardError.error}`);
+        const apiResponse = error instanceof APIError ? error.toApiResponse() : error.toApiResponse();
+        setProcessingError(`${apiResponse.code}: ${apiResponse.message}`);
         
         // If it's an API key error or missing connection, open settings
-        if (standardError.statusCode === 401 || standardError.error.includes('API key') || standardError.error.includes('Supabase connection')) {
+        if (apiResponse.code === 'INVALID_API_KEY' || apiResponse.code === 'SUPABASE_NOT_CONFIGURED') {
           setShowSettings(true);
         }
       } else {
@@ -471,7 +482,7 @@ function App() {
           <div className="flex-1 flex items-center justify-center p-8">
             <div className="max-w-md w-full text-center">
               <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <X className="w-8 h-8 text-red-600" />
+              {processingError?.includes('NETWORK_ERROR') && (
               </div>
               <h2 className="text-2xl font-semibold text-gray-900 mb-2">Processing Failed</h2>
               <div className="text-gray-600 mb-6">
@@ -487,9 +498,9 @@ function App() {
                       Simply upload an audio file without entering API keys to see how the transcription and summary features work.
                     </p>
                   </div>
-                )}
+              {processingError?.includes('quota') || processingError?.includes('RATE_LIMIT') ? (
               </div>
-              <div className="space-y-3">
+              ) : processingError?.includes('INVALID_API_KEY') ? (
                 <button
                   onClick={resetApp}
                   className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"

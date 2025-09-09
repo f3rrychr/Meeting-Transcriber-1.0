@@ -4,6 +4,57 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
+// Get limits from environment variables with fallbacks
+const getFileSizeLimit = (): number => {
+  const envLimit = Deno.env.get('MAX_FILE_SIZE_MB');
+  return envLimit ? parseInt(envLimit) * 1024 * 1024 : 500 * 1024 * 1024; // Default 500MB
+};
+
+const getOpenAIChunkLimit = (): number => {
+  const envLimit = Deno.env.get('OPENAI_CHUNK_SIZE_MB');
+  return envLimit ? parseInt(envLimit) * 1024 * 1024 : 25 * 1024 * 1024; // Default 25MB
+};
+
+// Standard response format
+interface ApiResponse<T = any> {
+  ok: boolean;
+  code: string;
+  message: string;
+  data?: T;
+}
+
+function createErrorResponse(code: string, message: string, status: number = 500): Response {
+  const response: ApiResponse = {
+    ok: false,
+    code,
+    message
+  };
+  
+  return new Response(
+    JSON.stringify(response),
+    {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    }
+  );
+}
+
+function createSuccessResponse<T>(data: T): Response {
+  const response: ApiResponse<T> = {
+    ok: true,
+    code: 'SUCCESS',
+    message: 'Operation completed successfully',
+    data
+  };
+  
+  return new Response(
+    JSON.stringify(response),
+    {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    }
+  );
+}
+
 Deno.serve(async (req: Request) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -15,17 +66,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     if (req.method !== "POST") {
-      return new Response(
-        JSON.stringify({ 
-          error: "Method not allowed",
-          statusCode: 405,
-          apiType: "supabase"
-        }),
-        {
-          status: 405,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      return createErrorResponse('METHOD_NOT_ALLOWED', 'Method not allowed', 405);
     }
 
     // Get the form data from the request
@@ -42,42 +83,28 @@ Deno.serve(async (req: Request) => {
     });
 
     if (!audioFile) {
-      return new Response(
-        JSON.stringify({ 
-          error: "No audio file provided",
-          statusCode: 400,
-          apiType: "supabase"
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      return createErrorResponse('NO_FILE', 'No audio file provided', 400);
     }
 
     if (!apiKey || !apiKey.startsWith("sk-")) {
-      return new Response(
-        JSON.stringify({ 
-          error: "Invalid OpenAI API key. Key should start with 'sk-'",
-          statusCode: 401,
-          apiType: "openai"
-        }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      return createErrorResponse('INVALID_API_KEY', "Invalid OpenAI API key. Key should start with 'sk-'", 401);
+    }
+
+    // Check file size limits
+    const fileSizeLimit = getFileSizeLimit();
+    if (audioFile.size > fileSizeLimit) {
+      const limitMB = Math.round(fileSizeLimit / 1024 / 1024);
+      const fileMB = Math.round(audioFile.size / 1024 / 1024);
+      return createErrorResponse('FILE_TOO_LARGE', `File size (${fileMB}MB) exceeds maximum allowed size (${limitMB}MB)`, 413);
     }
 
     console.log("Processing audio file:", audioFile.name, "Size:", audioFile.size);
 
-    // Handle large files by processing them in chunks if needed
-    let processedFile = audioFile;
-    
-    // For files larger than OpenAI's limit, we need to chunk or compress
-    const openaiMaxSize = 25 * 1024 * 1024; // 25MB - OpenAI's actual limit
-    if (audioFile.size > openaiMaxSize) {
-      console.log(`Large file detected (${Math.round(audioFile.size / 1024 / 1024)}MB). Processing in segments...`);
+    // Check OpenAI chunk size limits
+    const openaiChunkLimit = getOpenAIChunkLimit();
+    if (audioFile.size > openaiChunkLimit) {
+      const limitMB = Math.round(openaiChunkLimit / 1024 / 1024);
+      console.log(`Large file detected (${Math.round(audioFile.size / 1024 / 1024)}MB), OpenAI limit: ${limitMB}MB. Processing in segments...`);
       
       // For now, we'll try to process the file directly and let OpenAI handle it
       // In a production environment, you might want to:
@@ -113,17 +140,10 @@ Deno.serve(async (req: Request) => {
       const errorData = await openaiResponse.json().catch(() => ({}));
       console.error("OpenAI API error:", errorData);
       
-      return new Response(
-        JSON.stringify({ 
-          error: errorData.error?.message || "OpenAI API error occurred",
-          statusCode: openaiResponse.status,
-          apiType: "openai",
-          details: errorData.error?.type || undefined
-        }),
-        {
-          status: openaiResponse.status,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+      return createErrorResponse(
+        'OPENAI_API_ERROR',
+        errorData.error?.message || "OpenAI API error occurred",
+        openaiResponse.status
       );
     }
 
@@ -172,26 +192,14 @@ Deno.serve(async (req: Request) => {
 
     console.log("Returning formatted transcription result");
 
-    return new Response(
-      JSON.stringify(result),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    return createSuccessResponse(result);
 
   } catch (error) {
     console.error("Edge function error:", error);
     
-    return new Response(
-      JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'Unknown server error',
-        statusCode: 500,
-        apiType: "supabase"
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+    return createErrorResponse(
+      'SERVER_ERROR',
+      error instanceof Error ? error.message : 'Unknown server error'
     );
   }
 });

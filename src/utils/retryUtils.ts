@@ -19,6 +19,7 @@ export interface RetryError extends Error {
 export class RetryableError extends Error implements RetryError {
   constructor(
     message: string,
+    public code: string = 'RETRYABLE_ERROR',
     public statusCode?: number,
     public retryAfter?: number,
     public attempt?: number,

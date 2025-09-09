@@ -1,10 +1,26 @@
 // Edge Function Service for real API calls through Supabase
 import { TranscriptData, SummaryData } from '../types';
-import { StandardError } from '../types';
+import { ApiResponse } from '../types';
 import { streamFileUpload, validateFileStream, StreamError } from '../utils/streamUtils';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+// Get limits from environment variables with fallbacks
+const getFileSizeLimit = (): number => {
+  const envLimit = import.meta.env.VITE_MAX_FILE_SIZE_MB;
+  return envLimit ? parseInt(envLimit) * 1024 * 1024 : 500 * 1024 * 1024; // Default 500MB
+};
+
+const getDurationLimit = (): number => {
+  const envLimit = import.meta.env.VITE_MAX_DURATION_MINUTES;
+  return envLimit ? parseInt(envLimit) : 180; // Default 180 minutes (3 hours)
+};
+
+const getOpenAIChunkLimit = (): number => {
+  const envLimit = import.meta.env.VITE_OPENAI_CHUNK_SIZE_MB;
+  return envLimit ? parseInt(envLimit) * 1024 * 1024 : 25 * 1024 * 1024; // Default 25MB
+};
 
 export interface ProgressCallback {
   (phase: 'upload' | 'processing' | 'transcription' | 'summary', 
@@ -28,12 +44,21 @@ interface UploadResponse {
 }
 
 export class EdgeFunctionError extends Error {
-  constructor(message: string, public statusCode?: number) {
+  constructor(message: string, public code: string = 'EDGE_FUNCTION_ERROR', public statusCode?: number) {
     super(message);
     this.name = 'EdgeFunctionError';
   }
 
-  toStandardError(): StandardError {
+  toApiResponse(): ApiResponse {
+    return {
+      ok: false,
+      code: this.code,
+      message: this.message
+    };
+  }
+
+  // Legacy method for backward compatibility
+  toStandardError(): { error: string; statusCode?: number; apiType: string } {
     return {
       error: this.message,
       statusCode: this.statusCode,
@@ -470,19 +495,19 @@ export const generateSummaryViaEdgeFunction = async (
   console.log('generateSummaryViaEdgeFunction called');
   
   if (!SUPABASE_URL) {
-    throw new EdgeFunctionError('Supabase URL not configured. Please click "Connect to Supabase" in the top right to set up your Supabase connection.');
+    throw new EdgeFunctionError('Supabase URL not configured. Please click "Connect to Supabase" in the top right to set up your Supabase connection.', 'SUPABASE_NOT_CONFIGURED');
   }
 
   if (!SUPABASE_ANON_KEY) {
-    throw new EdgeFunctionError('Supabase anonymous key not configured. Please set up your Supabase connection.');
+    throw new EdgeFunctionError('Supabase anonymous key not configured. Please set up your Supabase connection.', 'SUPABASE_NOT_CONFIGURED');
   }
 
   if (!apiKey || !apiKey.startsWith('sk-')) {
-    throw new EdgeFunctionError('Invalid OpenAI API key for summary generation');
+    throw new EdgeFunctionError('Invalid OpenAI API key for summary generation', 'INVALID_API_KEY');
   }
 
   if (!transcript || !transcript.speakers || transcript.speakers.length === 0) {
-    throw new EdgeFunctionError('Invalid transcript data for summary generation');
+    throw new EdgeFunctionError('Invalid transcript data for summary generation', 'INVALID_INPUT');
   }
 
   onProgress?.('summary', 0, 'Generating summary with GPT...');
@@ -514,11 +539,12 @@ export const generateSummaryViaEdgeFunction = async (
       console.error('Summary edge function error:', errorData);
       
       if (response.status === 401) {
-        throw new EdgeFunctionError('Invalid OpenAI API key. Please check your API key in Settings.', 401);
+        throw new EdgeFunctionError('Invalid OpenAI API key. Please check your API key in Settings.', 'INVALID_API_KEY', 401);
       }
       
       throw new EdgeFunctionError(
-        errorData.error || 'Summary generation error occurred',
+        errorData.message || errorData.error || 'Summary generation error occurred',
+        errorData.code || 'SUMMARY_ERROR',
         response.status
       );
     }
@@ -536,10 +562,10 @@ export const generateSummaryViaEdgeFunction = async (
     }
     
     if (error instanceof TypeError && error.message.includes('fetch')) {
-      throw new EdgeFunctionError('Network error: Unable to connect to Supabase edge function. Please check your Supabase connection and try again.');
+      throw new EdgeFunctionError('Network error: Unable to connect to Supabase edge function. Please check your Supabase connection and try again.', 'NETWORK_ERROR');
     }
     
-    throw new EdgeFunctionError(`Failed to generate summary: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new EdgeFunctionError(`Failed to generate summary: ${error instanceof Error ? error.message : 'Unknown error'}`, 'SUMMARY_ERROR');
   }
 };
 

@@ -1,6 +1,17 @@
 import React from 'react';
 import { X, BookOpen, Key, Settings, Play } from 'lucide-react';
 
+// Get limits from environment variables with fallbacks
+const getFileSizeLimit = (): number => {
+  const envLimit = import.meta.env.VITE_MAX_FILE_SIZE_MB;
+  return envLimit ? parseInt(envLimit) * 1024 * 1024 : 500 * 1024 * 1024; // Default 500MB
+};
+
+const getDurationLimit = (): number => {
+  const envLimit = import.meta.env.VITE_MAX_DURATION_MINUTES;
+  return envLimit ? parseInt(envLimit) : 180; // Default 180 minutes (3 hours)
+};
+
 interface UserGuideModalProps {
   onClose: () => void;
   onOpenSettings: () => void;
@@ -92,7 +103,7 @@ const UserGuideModal: React.FC<UserGuideModalProps> = ({ onClose, onOpenSettings
                 </p>
                 <ul className="text-sm text-gray-600 space-y-1 ml-4">
                   <li>• Supported formats: MP3, WAV, AAC, M4A, OGG, WebM</li>
-                  <li>• Maximum file size: 250MB (≈3 hours)</li>
+                  <li>• Maximum file size: {Math.round(getFileSizeLimit() / 1024 / 1024)}MB (≈{Math.round(getDurationLimit() / 60)} hours)</li>
                   <li>• Drag & drop or click "Choose Audio File"</li>
                 </ul>
               </div>

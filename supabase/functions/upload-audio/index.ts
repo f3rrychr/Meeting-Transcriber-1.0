@@ -4,11 +4,57 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
+// Get limits from environment variables with fallbacks
+const getFileSizeLimit = (): number => {
+  const envLimit = Deno.env.get('MAX_FILE_SIZE_MB');
+  return envLimit ? parseInt(envLimit) * 1024 * 1024 : 500 * 1024 * 1024; // Default 500MB
+};
+
+// Standard response format
+interface ApiResponse<T = any> {
+  ok: boolean;
+  code: string;
+  message: string;
+  data?: T;
+}
+
 interface UploadResponse {
   uploadId: string;
   storagePath: string;
   fileSize: number;
   fileName: string;
+}
+
+function createErrorResponse(code: string, message: string, status: number = 500): Response {
+  const response: ApiResponse = {
+    ok: false,
+    code,
+    message
+  };
+  
+  return new Response(
+    JSON.stringify(response),
+    {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    }
+  );
+}
+
+function createSuccessResponse<T>(data: T): Response {
+  const response: ApiResponse<T> = {
+    ok: true,
+    code: 'SUCCESS',
+    message: 'Upload completed successfully',
+    data
+  };
+  
+  return new Response(
+    JSON.stringify(response),
+    {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    }
+  );
 }
 
 Deno.serve(async (req: Request) => {
@@ -22,17 +68,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     if (req.method !== "POST") {
-      return new Response(
-        JSON.stringify({ 
-          error: "Method not allowed",
-          statusCode: 405,
-          apiType: "supabase"
-        }),
-        {
-          status: 405,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      return createErrorResponse('METHOD_NOT_ALLOWED', 'Method not allowed', 405);
     }
 
     // Get the form data from the request
@@ -48,31 +84,19 @@ Deno.serve(async (req: Request) => {
     });
 
     if (!audioFile) {
-      return new Response(
-        JSON.stringify({ 
-          error: "No audio file provided",
-          statusCode: 400,
-          apiType: "supabase"
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      return createErrorResponse('NO_FILE', 'No audio file provided', 400);
     }
 
     if (!apiKey || !apiKey.startsWith("sk-")) {
-      return new Response(
-        JSON.stringify({ 
-          error: "Invalid OpenAI API key. Key should start with 'sk-'",
-          statusCode: 401,
-          apiType: "openai"
-        }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      return createErrorResponse('INVALID_API_KEY', "Invalid OpenAI API key. Key should start with 'sk-'", 401);
+    }
+
+    // Check file size limits
+    const fileSizeLimit = getFileSizeLimit();
+    if (audioFile.size > fileSizeLimit) {
+      const limitMB = Math.round(fileSizeLimit / 1024 / 1024);
+      const fileMB = Math.round(audioFile.size / 1024 / 1024);
+      return createErrorResponse('FILE_TOO_LARGE', `File size (${fileMB}MB) exceeds maximum allowed size (${limitMB}MB)`, 413);
     }
 
     // Generate unique upload ID
@@ -102,17 +126,7 @@ Deno.serve(async (req: Request) => {
 
     if (uploadError) {
       console.error('Storage upload error:', uploadError);
-      return new Response(
-        JSON.stringify({ 
-          error: `Failed to upload file to storage: ${uploadError.message}`,
-          statusCode: 500,
-          apiType: "supabase"
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      return createErrorResponse('STORAGE_ERROR', `Failed to upload file to storage: ${uploadError.message}`);
     }
 
     console.log('File uploaded to storage successfully:', uploadData.path);
@@ -143,26 +157,14 @@ Deno.serve(async (req: Request) => {
       fileName: audioFile.name
     };
 
-    return new Response(
-      JSON.stringify(response),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    return createSuccessResponse(response);
 
   } catch (error) {
     console.error("Upload function error:", error);
     
-    return new Response(
-      JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'Unknown server error',
-        statusCode: 500,
-        apiType: "supabase"
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+    return createErrorResponse(
+      'SERVER_ERROR',
+      error instanceof Error ? error.message : 'Unknown server error'
     );
   }
 });

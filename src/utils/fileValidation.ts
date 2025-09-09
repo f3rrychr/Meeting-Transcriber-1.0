@@ -1,5 +1,16 @@
 // File validation utilities with MIME sniffing and audio type detection
 
+// Get limits from environment variables with fallbacks
+const getFileSizeLimit = (): number => {
+  const envLimit = import.meta.env.VITE_MAX_FILE_SIZE_MB;
+  return envLimit ? parseInt(envLimit) * 1024 * 1024 : 500 * 1024 * 1024; // Default 500MB
+};
+
+const getDurationLimit = (): number => {
+  const envLimit = import.meta.env.VITE_MAX_DURATION_MINUTES;
+  return envLimit ? parseInt(envLimit) : 180; // Default 180 minutes (3 hours)
+};
+
 export interface FileValidationResult {
   isValid: boolean;
   error?: string;
@@ -137,7 +148,7 @@ const generateRemediationTip = (detectedType: string, extension: string): string
  * Comprehensive file validation with MIME sniffing
  */
 export const validateAudioFile = async (file: File): Promise<FileValidationResult> => {
-  const maxSize = 500 * 1024 * 1024; // 500MB
+  const maxSize = getFileSizeLimit();
   const extension = getFileExtension(file.name);
   
   console.log('Validating file:', {
@@ -149,9 +160,11 @@ export const validateAudioFile = async (file: File): Promise<FileValidationResul
   
   // Check file size first
   if (file.size > maxSize) {
+    const limitMB = Math.round(maxSize / 1024 / 1024);
+    const fileMB = Math.round(file.size / 1024 / 1024);
     return {
       isValid: false,
-      error: 'File size exceeds 500MB limit. Please use a smaller audio file.',
+      error: `File size (${fileMB}MB) exceeds ${limitMB}MB limit. Please use a smaller audio file.`,
       remediationTip: 'Try compressing the audio file or splitting it into smaller segments.'
     };
   }

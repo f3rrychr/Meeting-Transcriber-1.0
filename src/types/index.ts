@@ -76,6 +76,14 @@ export interface ExportPreferences {
 }
 
 // Standard error interface for API responses
+export interface ApiResponse<T = any> {
+  ok: boolean;
+  code: string;
+  message: string;
+  data?: T;
+}
+
+// Legacy interface for backward compatibility
 export interface StandardError {
   error: string;
   statusCode?: number;

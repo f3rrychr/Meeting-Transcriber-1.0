@@ -2,10 +2,34 @@
 import { TranscriptData, SummaryData, TranscriptSegment, Speaker } from '../types';
 import { AudioProcessor } from '../utils/audioUtils';
 
+// Get limits from environment variables with fallbacks
+const getFileSizeLimit = (): number => {
+  const envLimit = import.meta.env.VITE_MAX_FILE_SIZE_MB;
+  return envLimit ? parseInt(envLimit) * 1024 * 1024 : 500 * 1024 * 1024; // Default 500MB
+};
+
+const getDurationLimit = (): number => {
+  const envLimit = import.meta.env.VITE_MAX_DURATION_MINUTES;
+  return envLimit ? parseInt(envLimit) : 180; // Default 180 minutes (3 hours)
+};
+
+const getOpenAIChunkLimit = (): number => {
+  const envLimit = import.meta.env.VITE_OPENAI_CHUNK_SIZE_MB;
+  return envLimit ? parseInt(envLimit) * 1024 * 1024 : 25 * 1024 * 1024; // Default 25MB
+};
+
 export class APIError extends Error {
-  constructor(message: string, public statusCode?: number, public apiType?: string) {
+  constructor(message: string, public code: string = 'API_ERROR', public statusCode?: number, public apiType?: string) {
     super(message);
     this.name = 'APIError';
+  }
+
+  toApiResponse(): { ok: false; code: string; message: string } {
+    return {
+      ok: false,
+      code: this.code,
+      message: this.message
+    };
   }
 }
 
@@ -28,7 +52,7 @@ export const transcribeAudio = async (file: File, apiKey: string): Promise<Trans
   
   if (!apiKey || !apiKey.startsWith('sk-')) {
     console.error('Invalid API key:', { hasKey: !!apiKey, startsWithSk: apiKey?.startsWith('sk-') });
-    throw new APIError('Invalid OpenAI API key. Key should start with "sk-"', 401, 'openai');
+    throw new APIError('Invalid OpenAI API key. Key should start with "sk-"', 'INVALID_API_KEY', 401, 'openai');
   }
 
   // Check if file needs compression for OpenAI's 25MB limit
@@ -36,8 +60,8 @@ export const transcribeAudio = async (file: File, apiKey: string): Promise<Trans
   // Process large files if needed
   console.log(`Processing file: ${file.name} (${AudioProcessor.formatFileSize(file.size)})`);
   
-  // For very large files, we'll let the edge function handle the processing
-  // The edge function can chunk the file or use streaming techniques
+  const chunkLimit = getOpenAIChunkLimit();
+  console.log(`OpenAI chunk limit: ${Math.round(chunkLimit / 1024 / 1024)}MB`);
 
   const formData = new FormData();
   formData.append('file', processedFile);
@@ -83,7 +107,8 @@ export const transcribeAudio = async (file: File, apiKey: string): Promise<Trans
       // Handle specific OpenAI error types
       if (response.status === 0) {
         throw new APIError(
-          'Unable to reach OpenAI servers. This could be due to CORS restrictions in the browser, network issues, firewall restrictions, or OpenAI service outage. Try using the application from a different network or contact your IT administrator.',
+          'Unable to reach OpenAI servers. This could be due to CORS restrictions in the browser, network issues, firewall restrictions, or OpenAI service outage.',
+          'NETWORK_ERROR',
           response.status,
           'openai'
         );
@@ -92,12 +117,13 @@ export const transcribeAudio = async (file: File, apiKey: string): Promise<Trans
       if (response.status === 401) {
         throw new APIError(
           'Invalid OpenAI API key. Please check your API key in Settings and ensure it has sufficient permissions.',
+          'INVALID_API_KEY',
           response.status,
           'openai'
         );
       }
       
-      throw new APIError(errorMessage, response.status, 'openai');
+      throw new APIError(errorMessage, 'OPENAI_API_ERROR', response.status, 'openai');
     }
 
     const data = await response.json();
@@ -106,7 +132,7 @@ export const transcribeAudio = async (file: File, apiKey: string): Promise<Trans
     // Validate response data
     if (!data || !data.segments) {
       console.error('Invalid response from OpenAI API:', data);
-      throw new APIError('Invalid response from OpenAI API - no segments found', undefined, 'openai');
+      throw new APIError('Invalid response from OpenAI API - no segments found', 'INVALID_RESPONSE', undefined, 'openai');
     }
     
     // Convert OpenAI response to our TranscriptData format
@@ -126,15 +152,15 @@ export const transcribeAudio = async (file: File, apiKey: string): Promise<Trans
     // Handle different types of network errors
     if (error instanceof TypeError) {
       if (error.message.includes('fetch') || error.message.includes('network')) {
-        throw new APIError('Network error: Unable to connect to OpenAI API. This is likely due to CORS restrictions when running in a browser environment. The OpenAI API cannot be called directly from a browser due to security restrictions.', undefined, 'openai');
+        throw new APIError('Network error: Unable to connect to OpenAI API. This is likely due to CORS restrictions when running in a browser environment.', 'NETWORK_ERROR', undefined, 'openai');
       }
     }
     
     if (error.name === 'AbortError') {
-      throw new APIError('Request timed out after 5 minutes. Please try with a smaller file or check your connection.', undefined, 'openai');
+      throw new APIError('Request timed out after 5 minutes. Please try with a smaller file or check your connection.', 'TIMEOUT_ERROR', undefined, 'openai');
     }
     
-    throw new APIError(`Failed to transcribe audio: ${error instanceof Error ? error.message : 'Unknown error'}`, undefined, 'openai');
+    throw new APIError(`Failed to transcribe audio: ${error instanceof Error ? error.message : 'Unknown error'}`, 'TRANSCRIPTION_ERROR', undefined, 'openai');
   }
   finally {
     clearTimeout(timeoutId);
@@ -147,7 +173,7 @@ const formatWhisperResponse = (whisperData: any, originalFile: File, wasCompress
   
   if (!whisperData.segments || !Array.isArray(whisperData.segments)) {
     console.error('Invalid whisper data - no segments array:', whisperData);
-    throw new APIError('Invalid transcription data received from OpenAI', undefined, 'openai');
+    throw new APIError('Invalid transcription data received from OpenAI', 'INVALID_RESPONSE', undefined, 'openai');
   }
   
   const segments: TranscriptSegment[] = whisperData.segments?.map((segment: any) => ({
@@ -277,11 +303,11 @@ export const generateSummary = async (transcript: TranscriptData, apiKey: string
   const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
   
   if (!apiKey || !apiKey.startsWith('sk-')) {
-    throw new APIError('Invalid OpenAI API key for summary generation', 401, 'openai');
+    throw new APIError('Invalid OpenAI API key for summary generation', 'INVALID_API_KEY', 401, 'openai');
   }
 
   if (!transcript || !transcript.speakers || transcript.speakers.length === 0) {
-    throw new APIError('Invalid transcript data for summary generation', undefined, 'openai');
+    throw new APIError('Invalid transcript data for summary generation', 'INVALID_INPUT', undefined, 'openai');
   }
 
   // Prepare transcript text for GPT
@@ -292,7 +318,7 @@ export const generateSummary = async (transcript: TranscriptData, apiKey: string
   console.log('Transcript text length:', transcriptText.length);
   
   if (transcriptText.length === 0) {
-    throw new APIError('Empty transcript - cannot generate summary', undefined, 'openai');
+    throw new APIError('Empty transcript - cannot generate summary', 'EMPTY_TRANSCRIPT', undefined, 'openai');
   }
 
   const prompt = `Please analyze the following meeting transcript and provide a structured summary in JSON format with the following structure:
@@ -365,7 +391,7 @@ ${transcriptText}`;
       const errorData = await response.json().catch(() => ({}));
       console.error('GPT API error:', errorData);
       const errorMessage = errorData.error?.message || `OpenAI API error: ${response.status}`;
-      throw new APIError(errorMessage, response.status, 'openai');
+      throw new APIError(errorMessage, 'OPENAI_API_ERROR', response.status, 'openai');
     }
 
     const data = await response.json();
@@ -373,7 +399,7 @@ ${transcriptText}`;
     const summaryText = data.choices[0]?.message?.content;
 
     if (!summaryText) {
-      throw new APIError('No summary generated from OpenAI API', undefined, 'openai');
+      throw new APIError('No summary generated from OpenAI API', 'NO_SUMMARY_GENERATED', undefined, 'openai');
     }
 
     console.log('Summary text received:', summaryText);
@@ -454,15 +480,15 @@ ${transcriptText}`;
     // Handle different types of network errors
     if (error instanceof TypeError) {
       if (error.message.includes('fetch') || error.message.includes('network')) {
-        throw new APIError('Network error: Unable to connect to OpenAI API. This is likely due to CORS restrictions when running in a browser environment. The OpenAI API cannot be called directly from a browser due to security restrictions.', undefined, 'openai');
+        throw new APIError('Network error: Unable to connect to OpenAI API. This is likely due to CORS restrictions when running in a browser environment.', 'NETWORK_ERROR', undefined, 'openai');
       }
     }
     
     if (error.name === 'AbortError') {
-      throw new APIError('Request timed out. Please try with a smaller file or check your connection.', undefined, 'openai');
+      throw new APIError('Request timed out. Please try with a smaller file or check your connection.', 'TIMEOUT_ERROR', undefined, 'openai');
     }
     
-    throw new APIError(`Failed to generate summary: ${error instanceof Error ? error.message : 'Unknown error'}`, undefined, 'openai');
+    throw new APIError(`Failed to generate summary: ${error instanceof Error ? error.message : 'Unknown error'}`, 'SUMMARY_ERROR', undefined, 'openai');
   }
   finally {
     clearTimeout(timeoutId);

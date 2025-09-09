@@ -3,6 +3,17 @@ import { Upload, FileAudio, AlertCircle, Mic } from 'lucide-react';
 import { validateAudioFile, getSupportedFormats, getFileAcceptString } from '../utils/fileValidation';
 import AudioRecorder from './AudioRecorder';
 
+// Get limits from environment variables with fallbacks
+const getFileSizeLimit = (): number => {
+  const envLimit = import.meta.env.VITE_MAX_FILE_SIZE_MB;
+  return envLimit ? parseInt(envLimit) * 1024 * 1024 : 500 * 1024 * 1024; // Default 500MB
+};
+
+const getDurationLimit = (): number => {
+  const envLimit = import.meta.env.VITE_MAX_DURATION_MINUTES;
+  return envLimit ? parseInt(envLimit) : 180; // Default 180 minutes (3 hours)
+};
+
 interface AudioUploadProps {
   onFileUpload: (file: File) => void;
 }
@@ -120,7 +131,7 @@ const AudioUpload: React.FC<AudioUploadProps> = ({ onFileUpload }) => {
                 
                 <div className="text-xs text-gray-500 space-y-1">
                   <p>Supported formats: {supportedFormats.join(', ')}</p>
-                  <p>Large files will be automatically processed</p>
+                  <p>Maximum size: {Math.round(getFileSizeLimit() / 1024 / 1024)}MB (≈{Math.round(getDurationLimit() / 60)} hours)</p>
                 </div>
               </div>
             </div>
