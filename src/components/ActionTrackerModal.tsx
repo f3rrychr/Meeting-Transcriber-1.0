@@ -116,31 +116,8 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
         
         // Always show sample data when no real action items exist
         if (groupedArray.length === 0) {
-          console.log('ActionTracker: No action items found, showing sample data');
-          const sampleActionItems: GroupedActionItems[] = [{
-            date: '6/13/2023',
-            items: [
-              {
-                task: 'Follow up on municipal board order compliance',
-                assignee: 'Mayor Patrick Terry',
-                dueDate: '2025-09-10',
-                remarks: 'Ensure all requirements are met',
-                sourceId: '1756807348347',
-                sourceMeeting: '2023-06-13 Special Council Meeting',
-                sourceDate: '6/13/2023'
-              },
-              {
-                task: 'Review development agreement with legal counsel',
-                assignee: 'Council Legal Team',
-                dueDate: '2025-09-15',
-                remarks: 'Address public concerns raised',
-                sourceId: '1756807348347',
-                sourceMeeting: '2023-06-13 Special Council Meeting',
-                sourceDate: '6/13/2023'
-              }
-            ]
-          }];
-          setGroupedActionItems(sampleActionItems);
+          console.log('ActionTracker: No action items found');
+          setGroupedActionItems([]);
         }
       } catch (error) {
         debugLog += `Error: ${error}\n`;
@@ -290,7 +267,7 @@ const ActionTrackerModal: React.FC<ActionTrackerModalProps> = ({ onClose }) => {
               `Showing ${groupedActionItems.reduce((sum, group) => sum + group.items.length, 0)} action items from ${groupedActionItems.length} meeting session${groupedActionItems.length !== 1 ? 's' : ''}` : 
               totalRecords > 0 ? 
                 `${totalRecords} meeting record${totalRecords !== 1 ? 's' : ''} found, but no action items detected` :
-                'No action items to display'
+                'No meeting records found. Process audio files to see action items here.'
             }
           </div>
           <button

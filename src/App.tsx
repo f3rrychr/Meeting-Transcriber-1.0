@@ -14,7 +14,7 @@ import AudioUpload from './components/AudioUpload';
 import { TranscriptionStorage } from './utils/storageUtils';
 import { ProcessingState, TranscriptData, SummaryData, ExportPreferences, ProgressState } from './types/index';
 import { exportTranscriptAsDocx, exportSummaryAsDocx, exportTranscriptAsPdf, exportSummaryAsPdf } from './utils/exportUtils';
-import { transcribeAudio, diarizeSpeakers, generateSummary, validateAPIKeys, APIError } from './services/apiService';
+import { validateAPIKeys, APIError } from './services/apiService';
 import { transcribeAudioViaEdgeFunction, generateSummaryViaEdgeFunction, EdgeFunctionError, checkSupabaseConnection, uploadAudioToStorage, streamTranscribeFromStorage } from './services/edgeFunctionService';
 import { transcribeAudioSegmented, shouldUseSegmentedTranscription, SegmentedTranscriptionError } from './services/segmentedTranscriptionService';
 import { AudioProcessor } from './utils/audioUtils';
@@ -216,7 +216,9 @@ function App() {
       const hasValidApiKey = apiKeys.openai && apiKeys.openai.trim() !== '' && apiKeys.openai.startsWith('sk-');
       
       if (!hasValidApiKey) {
-        throw new EdgeFunctionError('OpenAI API key is required. Please add your API key in Settings.');
+        setProcessingState('error');
+        setProcessingError('OpenAI API key is required. Please add your API key in Settings and ensure Supabase is connected.');
+        return;
       }
 
       // Check if Supabase is connected before attempting transcription
@@ -224,7 +226,7 @@ function App() {
       
       if (!hasSupabaseConnection) {
         setProcessingState('error');
-        setProcessingError('Supabase connection is required. Please click "Connect to Supabase" in the top right corner to set up your Supabase project.');
+        setProcessingError('Supabase connection is required for real transcription. Please click "Connect to Supabase" in the top right corner to set up your Supabase project, then add your OpenAI API key in Settings.');
         return;
       }
 
@@ -370,13 +372,15 @@ function App() {
       let summaryData: SummaryData;
       
       if (!hasValidApiKey) {
-        throw new EdgeFunctionError('OpenAI API key is required for summary generation. Please add your API key in Settings.');
+        setProcessingState('error');
+        setProcessingError('OpenAI API key is required for summary generation. Please add your API key in Settings.');
+        return;
       }
 
       // Check if Supabase is connected before attempting summary generation
       if (!hasSupabaseConnection) {
         setProcessingState('error');
-        setProcessingError('Supabase connection is required for summary generation. Please click "Connect to Supabase" in the top right corner.');
+        setProcessingError('Supabase connection is required for summary generation. Please click "Connect to Supabase" in the top right corner to set up your Supabase project.');
         return;
       }
 
@@ -471,6 +475,16 @@ function App() {
         }
       } else {
         setProcessingError(`Processing failed at ${processingStep}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+      
+      // Always show settings for API-related errors
+      if (error instanceof Error && (
+        error.message.includes('API key') || 
+        error.message.includes('Supabase') ||
+        error.message.includes('401') ||
+        error.message.includes('authentication')
+      )) {
+        setShowSettings(true);
       }
     }
   };
