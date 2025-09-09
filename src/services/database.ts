@@ -1,16 +1,19 @@
 import Dexie, { Table } from 'dexie';
 import { Meeting, Attachment } from '../types/meeting';
+import { ActionItem } from '../types/action';
 
 export class MeetingDatabase extends Dexie {
   meetings!: Table<Meeting>;
   attachments!: Table<Attachment>;
+  actionItems!: Table<ActionItem>;
 
   constructor() {
     super('MeetingDatabase');
     
     this.version(1).stores({
       meetings: 'id, title, date, createdAt, updatedAt, version, isDirty, lastSyncedAt',
-      attachments: 'id, meetingId, name, createdAt, updatedAt, version, isDirty'
+      attachments: 'id, meetingId, name, createdAt, updatedAt, version, isDirty',
+      actionItems: 'id, no, meeting, pic, dueDate, status, createdAt, updatedAt, isDirty'
     });
 
     // Hooks for automatic timestamp updates
@@ -39,6 +42,18 @@ export class MeetingDatabase extends Dexie {
     this.attachments.hook('updating', (modifications, primKey, obj, trans) => {
       modifications.updatedAt = new Date().toISOString();
       modifications.version = (obj.version || 0) + 1;
+      modifications.isDirty = true;
+    });
+
+    this.actionItems.hook('creating', (primKey, obj, trans) => {
+      const now = new Date().toISOString();
+      obj.createdAt = now;
+      obj.updatedAt = now;
+      obj.isDirty = true;
+    });
+
+    this.actionItems.hook('updating', (modifications, primKey, obj, trans) => {
+      modifications.updatedAt = new Date().toISOString();
       modifications.isDirty = true;
     });
   }
@@ -130,6 +145,51 @@ export class MeetingDatabase extends Dexie {
 
   async getMeetingsWithConflicts(): Promise<Meeting[]> {
     return await this.meetings.where('conflictData').above('').toArray();
+  }
+
+  // Action Items operations
+  async createActionItem(actionItem: Omit<ActionItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+    const id = crypto.randomUUID();
+    await this.actionItems.add({
+      ...actionItem,
+      id,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      isDirty: true
+    });
+    return id;
+  }
+
+  async updateActionItem(id: string, updates: Partial<ActionItem>): Promise<void> {
+    await this.actionItems.update(id, {
+      ...updates,
+      updatedAt: new Date().toISOString(),
+      isDirty: true
+    });
+  }
+
+  async getActionItem(id: string): Promise<ActionItem | undefined> {
+    return await this.actionItems.get(id);
+  }
+
+  async getAllActionItems(): Promise<ActionItem[]> {
+    return await this.actionItems.orderBy('no').toArray();
+  }
+
+  async getActionItemsByMeeting(meeting: string): Promise<ActionItem[]> {
+    return await this.actionItems.where('meeting').equals(meeting).toArray();
+  }
+
+  async getDirtyActionItems(): Promise<ActionItem[]> {
+    return await this.actionItems.where('isDirty').equals(1).toArray();
+  }
+
+  async markActionItemClean(id: string): Promise<void> {
+    await this.actionItems.update(id, { isDirty: false });
+  }
+
+  async deleteActionItem(id: string): Promise<void> {
+    await this.actionItems.delete(id);
   }
 }
 

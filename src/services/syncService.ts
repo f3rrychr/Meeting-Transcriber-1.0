@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { db } from './database';
 import { Meeting, Attachment, SyncStatus, SyncConflict } from '../types/meeting';
+import { ActionItem, mapActionItemFromDB, mapActionItemToDB } from '../types/action';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -70,7 +71,8 @@ export class SyncService {
   private async updatePendingChanges(): Promise<void> {
     const dirtyMeetings = await db.getDirtyMeetings();
     const dirtyAttachments = await db.getDirtyAttachments();
-    this.syncStatus.pendingChanges = dirtyMeetings.length + dirtyAttachments.length;
+    const dirtyActionItems = await db.getDirtyActionItems();
+    this.syncStatus.pendingChanges = dirtyMeetings.length + dirtyAttachments.length + dirtyActionItems.length;
   }
 
   // Auto-sync (non-blocking)
@@ -149,6 +151,21 @@ export class SyncService {
     // Merge attachments
     for (const remoteAttachment of remoteAttachments || []) {
       await this.mergeAttachment(remoteAttachment);
+    }
+
+    // Pull action items
+    const { data: remoteActionItems, error: actionItemsError } = await this.supabase
+      .from('action_items')
+      .select('*')
+      .gte('updated_at', lastSync);
+    
+    if (actionItemsError) {
+      throw new Error(`Failed to pull action items: ${actionItemsError.message}`);
+    }
+
+    // Merge action items
+    for (const remoteActionItem of remoteActionItems || []) {
+      await this.mergeActionItem(remoteActionItem);
     }
   }
 
@@ -324,6 +341,35 @@ export class SyncService {
       // Mark as clean
       await db.markAttachmentClean(attachment.id, attachment.version);
     }
+
+    // Push dirty action items
+    const dirtyActionItems = await db.getDirtyActionItems();
+    for (const actionItem of dirtyActionItems) {
+      const dbActionItem = mapActionItemToDB(actionItem);
+      
+      const { error } = await this.supabase
+        .from('action_items')
+        .upsert({
+          id: dbActionItem.id,
+          no: dbActionItem.no,
+          meeting: dbActionItem.meeting,
+          action_item: dbActionItem.action_item,
+          pic: dbActionItem.pic,
+          due_date: dbActionItem.due_date,
+          remarks: dbActionItem.remarks,
+          status: dbActionItem.status,
+          created_at: dbActionItem.created_at,
+          updated_at: dbActionItem.updated_at
+        });
+
+      if (error) {
+        console.error(`Failed to push action item ${actionItem.id}:`, error);
+        continue;
+      }
+
+      // Mark as clean
+      await db.markActionItemClean(actionItem.id);
+    }
   }
 
   // Conflict resolution
@@ -350,6 +396,31 @@ export class SyncService {
 
   async getConflicts(): Promise<Meeting[]> {
     return await db.getMeetingsWithConflicts();
+  }
+
+  private async mergeActionItem(remoteActionItem: any): Promise<void> {
+    const actionItem = mapActionItemFromDB(remoteActionItem);
+    const localActionItem = await db.getActionItem(actionItem.id);
+    
+    if (!localActionItem) {
+      // New remote action item - add locally
+      await db.actionItems.add({
+        ...actionItem,
+        isDirty: false
+      });
+      return;
+    }
+
+    // Simple last-write-wins for action items (no conflict resolution for now)
+    const remoteUpdated = new Date(actionItem.updatedAt);
+    const localUpdated = new Date(localActionItem.updatedAt);
+
+    if (remoteUpdated > localUpdated) {
+      await db.actionItems.update(actionItem.id, {
+        ...actionItem,
+        isDirty: false
+      });
+    }
   }
 }
 

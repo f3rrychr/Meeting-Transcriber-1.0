@@ -107,6 +107,9 @@ export interface ApiKeys {
   huggingface: string;
 }
 
+// Re-export action types for convenience
+export type { ActionItem } from './action';
+
 // Progress state interface for detailed progress tracking
 export interface ProgressState {
   stage: 'validating' | 'compressing' | 'uploading' | 'transcribing' | 'summarizing' | 'saving' | 'complete';
