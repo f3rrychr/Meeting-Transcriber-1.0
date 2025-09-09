@@ -16,6 +16,7 @@ import { ProcessingState, TranscriptData, SummaryData, ExportPreferences, Progre
 import { exportTranscriptAsDocx, exportSummaryAsDocx, exportTranscriptAsPdf, exportSummaryAsPdf } from './utils/exportUtils';
 import { transcribeAudio, diarizeSpeakers, generateSummary, validateAPIKeys, APIError } from './services/apiService';
 import { transcribeAudioViaEdgeFunction, generateSummaryViaEdgeFunction, EdgeFunctionError, checkSupabaseConnection, uploadAudioToStorage, streamTranscribeFromStorage } from './services/edgeFunctionService';
+import { transcribeAudioSegmented, shouldUseSegmentedTranscription, SegmentedTranscriptionError } from './services/segmentedTranscriptionService';
 import { AudioProcessor } from './utils/audioUtils';
 import { ResumableUploadService } from './services/resumableUploadService';
 
@@ -231,49 +232,111 @@ function App() {
       try {
         setIsStreaming(true);
         
-        // First upload the file to storage (handles resumable uploads automatically)
-        const uploadResponse = await uploadAudioToStorage(
-          file,
-          apiKeys.openai,
-          (progress) => {
-            // Enhanced progress messages for large files
-            let message = progress.message;
-            if (ResumableUploadService.needsResumableUpload(file)) {
-              if (progress.stage === 'uploading') {
-                message = `Resumable upload: ${message}`;
-                if (progress.bytesUploaded && progress.totalBytes) {
-                  const uploadedMB = Math.round(progress.bytesUploaded / 1024 / 1024);
-                  const totalMB = Math.round(progress.totalBytes / 1024 / 1024);
-                  message += ` (${uploadedMB}/${totalMB}MB)`;
-                }
+        // Check if we should use segmented transcription for very long files
+        if (shouldUseSegmentedTranscription(file)) {
+          console.log('Using segmented transcription for long audio file');
+          
+          transcriptData = await transcribeAudioSegmented(file, {
+            apiKey: apiKeys.openai,
+            segmentDuration: 900, // 15 minutes
+            overlapDuration: 2,   // 2 seconds
+            maxConcurrentSegments: 3,
+            onOverallProgress: (progress) => {
+              let stage: 'validating' | 'compressing' | 'uploading' | 'transcribing' | 'summarizing' | 'saving' | 'complete';
+              let currentStageIndex: number;
+              
+              switch (progress.stage) {
+                case 'segmenting':
+                  stage = 'uploading';
+                  currentStageIndex = 2;
+                  break;
+                case 'transcribing':
+                  stage = 'transcribing';
+                  currentStageIndex = 3;
+                  break;
+                case 'stitching':
+                  stage = 'transcribing';
+                  currentStageIndex = 3;
+                  break;
+                case 'complete':
+                  stage = 'transcribing';
+                  currentStageIndex = 3;
+                  break;
+                default:
+                  stage = 'transcribing';
+                  currentStageIndex = 3;
+              }
+              
+              setProgressState(prev => ({
+                ...prev,
+                stage,
+                percentage: progress.percentage,
+                message: progress.message,
+                stageProgress: progress.percentage,
+                chunksReceived: progress.completedSegments,
+                totalChunks: progress.totalSegments,
+                currentStageIndex
+              }));
+            },
+            onSegmentComplete: (segmentIndex, totalSegments, result) => {
+              console.log(`Segment ${segmentIndex + 1}/${totalSegments} completed: ${result.text.substring(0, 100)}...`);
+              
+              // Add completed segment to streaming display
+              if (result.segments.length > 0) {
+                const newSegments = result.segments.map(seg => ({
+                  text: seg.text,
+                  timestamp: seg.timestamp
+                }));
+                setStreamingSegments(prev => [...prev, ...newSegments]);
               }
             }
-            
-            setProgressState(prev => ({
-              ...prev,
-              ...progress,
-              message
-            }));
-          }
-        );
-        
-        // Then transcribe from storage with streaming
-        transcriptData = await streamTranscribeFromStorage(
-          uploadResponse,
-          apiKeys.openai,
-          (progress) => {
-            setProgressState(prev => ({
-              ...prev,
-              ...progress
-            }));
-          }
-        );
+          });
+        } else {
+          // Use standard streaming transcription for smaller files
+          // First upload the file to storage (handles resumable uploads automatically)
+          const uploadResponse = await uploadAudioToStorage(
+            file,
+            apiKeys.openai,
+            (progress) => {
+              // Enhanced progress messages for large files
+              let message = progress.message;
+              if (ResumableUploadService.needsResumableUpload(file)) {
+                if (progress.stage === 'uploading') {
+                  message = `Resumable upload: ${message}`;
+                  if (progress.bytesUploaded && progress.totalBytes) {
+                    const uploadedMB = Math.round(progress.bytesUploaded / 1024 / 1024);
+                    const totalMB = Math.round(progress.totalBytes / 1024 / 1024);
+                    message += ` (${uploadedMB}/${totalMB}MB)`;
+                  }
+                }
+              }
+              
+              setProgressState(prev => ({
+                ...prev,
+                ...progress,
+                message
+              }));
+            }
+          );
+          
+          // Then transcribe from storage with streaming
+          transcriptData = await streamTranscribeFromStorage(
+            uploadResponse,
+            apiKeys.openai,
+            (progress) => {
+              setProgressState(prev => ({
+                ...prev,
+                ...progress
+              }));
+            }
+          );
+        }
         
         setIsStreaming(false);
-        console.log('Streaming transcription successful via edge function');
+        console.log('Transcription successful');
       } catch (error) {
         setIsStreaming(false);
-        console.error('Edge function streaming transcription failed:', error);
+        console.error('Transcription failed:', error);
         // Re-throw the error to show the user what went wrong
         throw error;
       }
@@ -397,6 +460,13 @@ function App() {
         
         // If it's an API key error or missing connection, open settings
         if (apiResponse.code === 'INVALID_API_KEY' || apiResponse.code === 'SUPABASE_NOT_CONFIGURED') {
+          setShowSettings(true);
+        }
+      } else if (error instanceof SegmentedTranscriptionError) {
+        setProcessingError(`Segmented Transcription Error: ${error.message}`);
+        
+        // If it's an API key error, open settings
+        if (error.code === 'INVALID_API_KEY') {
           setShowSettings(true);
         }
       } else {
