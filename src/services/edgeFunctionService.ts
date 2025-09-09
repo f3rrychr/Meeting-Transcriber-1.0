@@ -520,14 +520,14 @@ export const generateSummaryViaEdgeFunction = async (
     throw new EdgeFunctionError('Invalid transcript data for summary generation', 'INVALID_INPUT');
   }
 
-  onProgress?.('summary', 0, 'Generating summary with GPT...');
+  onProgress?.('summarizing', 0, 'Generating summary with GPT...', { stageProgress: 0 });
   
   const apiUrl = `${SUPABASE_URL}/functions/v1/generate-summary`;
   
   console.log('Sending summary request to edge function:', apiUrl);
 
   try {
-    onProgress?.('summary', 25, 'Sending transcript to AI...');
+    onProgress?.('summarizing', 25, 'Sending transcript to AI...', { stageProgress: 25 });
     
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -542,7 +542,7 @@ export const generateSummaryViaEdgeFunction = async (
     });
 
     console.log('Summary edge function response status:', response.status);
-    onProgress?.('summary', 75, 'Processing AI response...');
+    onProgress?.('summarizing', 75, 'Processing AI response...', { stageProgress: 75 });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
@@ -562,7 +562,7 @@ export const generateSummaryViaEdgeFunction = async (
     const summaryData = await response.json();
     console.log('Summary completed via edge function:', summaryData);
     
-    onProgress?.('summary', 100, 'Summary generation complete!');
+    onProgress?.('summarizing', 100, 'Summary generation complete!', { stageProgress: 100 });
     return summaryData as SummaryData;
   } catch (error) {
     console.error('Error calling summary edge function:', error);

@@ -458,14 +458,7 @@ function App() {
                 <p className="text-gray-600">{currentFile?.name}</p>
                 <p className="text-sm text-gray-500 mt-2">Please wait, this may take several minutes...</p>
               </div>
-              <ProgressBar progress={progress} />
-              <div className="mt-4 text-center text-sm text-gray-500">
-                {progress < 10 && "Uploading and validating audio file..."}
-                {progress >= 10 && progress < 40 && "Transcribing audio with OpenAI Whisper..."}
-                {progress >= 40 && progress < 70 && "Performing speaker diarization with Hugging Face..."}
-                {progress >= 70 && progress < 100 && "Generating summary with GPT-3.5..."}
-                {progress === 100 && "Processing complete!"}
-              </div>
+              <ProgressBar progressState={progressState} />
               <div className="mt-6 text-center">
                 <button
                   onClick={resetApp}
