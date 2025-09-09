@@ -17,6 +17,7 @@ import { exportTranscriptAsDocx, exportSummaryAsDocx, exportTranscriptAsPdf, exp
 import { transcribeAudio, diarizeSpeakers, generateSummary, validateAPIKeys, APIError } from './services/apiService';
 import { transcribeAudioViaEdgeFunction, generateSummaryViaEdgeFunction, EdgeFunctionError, checkSupabaseConnection, uploadAudioToStorage, streamTranscribeFromStorage } from './services/edgeFunctionService';
 import { AudioProcessor } from './utils/audioUtils';
+import { ResumableUploadService } from './services/resumableUploadService';
 
 // Get limits from environment variables with fallbacks
 const getFileSizeLimit = (): number => {
@@ -168,11 +169,21 @@ function App() {
       // Check if compression is needed
       processingStep = 'compression check';
       const needsCompression = AudioProcessor.needsCompression(file);
+      const needsResumableUpload = ResumableUploadService.needsResumableUpload(file);
+      
+      console.log('File processing requirements:', {
+        needsCompression,
+        needsResumableUpload,
+        fileSize: AudioProcessor.formatFileSize(file.size)
+      });
+      
       if (needsCompression) {
         setProgressState({
           stage: 'compressing',
           percentage: 8,
-          message: 'Compressing audio for optimal processing...',
+          message: needsResumableUpload 
+            ? 'Compressing large audio file for resumable upload...' 
+            : 'Compressing audio for optimal processing...',
           stageProgress: 100,
           completedStages: ['validating'],
           totalStages: 6,
@@ -220,14 +231,28 @@ function App() {
       try {
         setIsStreaming(true);
         
-        // First upload the file to storage
+        // First upload the file to storage (handles resumable uploads automatically)
         const uploadResponse = await uploadAudioToStorage(
           file,
           apiKeys.openai,
           (progress) => {
+            // Enhanced progress messages for large files
+            let message = progress.message;
+            if (ResumableUploadService.needsResumableUpload(file)) {
+              if (progress.stage === 'uploading') {
+                message = `Resumable upload: ${message}`;
+                if (progress.bytesUploaded && progress.totalBytes) {
+                  const uploadedMB = Math.round(progress.bytesUploaded / 1024 / 1024);
+                  const totalMB = Math.round(progress.totalBytes / 1024 / 1024);
+                  message += ` (${uploadedMB}/${totalMB}MB)`;
+                }
+              }
+            }
+            
             setProgressState(prev => ({
               ...prev,
-              ...progress
+              ...progress,
+              message
             }));
           }
         );

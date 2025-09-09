@@ -2,6 +2,7 @@
 import { TranscriptData, SummaryData } from '../types';
 import { ApiResponse } from '../types';
 import { streamFileUpload, validateFileStream, StreamError } from '../utils/streamUtils';
+import { ResumableUploadService, ResumableUploadResult } from './resumableUploadService';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -22,6 +23,8 @@ const getOpenAIChunkLimit = (): number => {
   return envLimit ? parseInt(envLimit) * 1024 * 1024 : 25 * 1024 * 1024; // Default 25MB
 };
 
+// File size threshold for resumable uploads (50MB)
+const RESUMABLE_UPLOAD_THRESHOLD = 50 * 1024 * 1024;
 export interface ProgressCallback {
   (progressState: {
     stage: 'validating' | 'compressing' | 'uploading' | 'transcribing' | 'summarizing' | 'saving' | 'complete';
@@ -94,6 +97,11 @@ export const uploadAudioToStorage = async (
     throw new EdgeFunctionError('Invalid OpenAI API key');
   }
 
+  // Check if file needs resumable upload
+  if (file.size > RESUMABLE_UPLOAD_THRESHOLD) {
+    console.log(`Large file detected (${Math.round(file.size / 1024 / 1024)}MB), using resumable upload`);
+    return await uploadLargeFileResumable(file, apiKey, onProgress);
+  }
   const apiUrl = `${SUPABASE_URL}/functions/v1/upload-audio`;
   
   onProgress?.({
@@ -159,6 +167,78 @@ export const uploadAudioToStorage = async (
   }
 };
 
+/**
+ * Upload large files using resumable upload service
+ */
+const uploadLargeFileResumable = async (
+  file: File,
+  apiKey: string,
+  onProgress?: ProgressCallback
+): Promise<UploadResponse> => {
+  try {
+    const resumableService = new ResumableUploadService(apiKey);
+    
+    const result = await resumableService.uploadAudio(file, {
+      apiKey,
+      onProgress: (resumableProgress) => {
+        // Map resumable progress to our progress callback format
+        let stage: 'validating' | 'compressing' | 'uploading' | 'transcribing' | 'summarizing' | 'saving' | 'complete';
+        let currentStageIndex: number;
+        
+        switch (resumableProgress.stage) {
+          case 'preparing':
+            stage = 'validating';
+            currentStageIndex = 0;
+            break;
+          case 'compressing':
+            stage = 'compressing';
+            currentStageIndex = 1;
+            break;
+          case 'uploading-original':
+          case 'uploading-compressed':
+            stage = 'uploading';
+            currentStageIndex = 2;
+            break;
+          case 'complete':
+            stage = 'uploading';
+            currentStageIndex = 2;
+            break;
+          default:
+            stage = 'uploading';
+            currentStageIndex = 2;
+        }
+        
+        onProgress?.({
+          stage,
+          percentage: resumableProgress.percentage,
+          message: resumableProgress.message,
+          stageProgress: resumableProgress.percentage,
+          bytesUploaded: resumableProgress.bytesUploaded,
+          totalBytes: resumableProgress.totalBytes,
+          currentStageIndex
+        });
+      },
+      onError: (error) => {
+        console.error('Resumable upload error:', error);
+        throw new EdgeFunctionError(`Resumable upload failed: ${error.message}`);
+      }
+    });
+    
+    // Convert ResumableUploadResult to UploadResponse format
+    const uploadResponse: UploadResponse = {
+      uploadId: result.uploadId,
+      storagePath: result.compressedPath || result.originalPath, // Prefer compressed for transcription
+      fileSize: result.compressedSize || result.originalSize,
+      fileName: file.name
+    };
+    
+    return uploadResponse;
+    
+  } catch (error) {
+    console.error('Resumable upload failed:', error);
+    throw new EdgeFunctionError(`Resumable upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+};
 export const transcribeFromStorage = async (
   uploadResponse: UploadResponse,
   apiKey: string,
