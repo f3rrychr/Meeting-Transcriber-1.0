@@ -105,7 +105,7 @@ const UserGuideModal: React.FC<UserGuideModalProps> = ({ onClose, onOpenSettings
                   <li>• Supported formats: MP3, WAV, AAC, M4A, OGG, WebM</li>
                   <li>• Maximum file size: {Math.round(getFileSizeLimit() / 1024 / 1024)}MB (≈{Math.round(getDurationLimit() / 60)} hours)</li>
                   <li>• Drag & drop or click "Choose Audio File"</li>
-                  <li>• Large files (>50MB) use resumable uploads automatically</li>
+                  <li>• Large files (&gt;50MB) use resumable uploads automatically</li>
                 </ul>
               </div>
             </div>
@@ -136,7 +136,7 @@ const UserGuideModal: React.FC<UserGuideModalProps> = ({ onClose, onOpenSettings
             <h4 className="font-medium text-blue-900 mb-2">💡 Pro Tips</h4>
             <ul className="text-sm text-blue-800 space-y-1">
               <li>• For best results, use clear audio recordings with minimal background noise</li>
-              <li>• Long files (>100MB) are automatically processed in segments for better performance</li>
+              <li>• Long files (&gt;100MB) are automatically processed in segments for better performance</li>
               <li>• You can customize export preferences in Settings → Export Preferences</li>
               <li>• All processing happens securely through Supabase edge functions</li>
             </ul>
