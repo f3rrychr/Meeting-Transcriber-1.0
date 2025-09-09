@@ -15,7 +15,7 @@ import { TranscriptionStorage } from './utils/storageUtils';
 import { ProcessingState, TranscriptData, SummaryData, ExportPreferences } from './types/index';
 import { exportTranscriptAsDocx, exportSummaryAsDocx, exportTranscriptAsPdf, exportSummaryAsPdf } from './utils/exportUtils';
 import { transcribeAudio, diarizeSpeakers, generateSummary, validateAPIKeys, APIError } from './services/apiService';
-import { transcribeAudioViaEdgeFunction, generateSummaryViaEdgeFunction, EdgeFunctionError, checkSupabaseConnection, uploadAudioToStorage, transcribeFromStorage, transcribeStreamingViaEdgeFunction } from './services/edgeFunctionService';
+import { transcribeAudioViaEdgeFunction, generateSummaryViaEdgeFunction, EdgeFunctionError, checkSupabaseConnection, uploadAudioToStorage, streamTranscribeFromStorage } from './services/edgeFunctionService';
 import { AudioProcessor } from './utils/audioUtils';
 
 // Local storage keys
@@ -165,16 +165,25 @@ function App() {
       console.log('Valid OpenAI API key found, attempting streaming transcription via edge function');
       try {
         setIsStreaming(true);
-        transcriptData = await transcribeStreamingViaEdgeFunction(
-          file, 
+        
+        // First upload the file to storage
+        const uploadResponse = await uploadAudioToStorage(
+          file,
           apiKeys.openai,
-          (segment) => {
-            setStreamingSegments(prev => [...prev, segment]);
-          },
           (progress, message) => {
             setProgress(progress);
           }
         );
+        
+        // Then transcribe from storage with streaming
+        transcriptData = await streamTranscribeFromStorage(
+          uploadResponse,
+          apiKeys.openai,
+          (progress, message) => {
+            setProgress(progress);
+          }
+        );
+        
         setIsStreaming(false);
         console.log('Streaming transcription successful via edge function');
       } catch (error) {

@@ -164,7 +164,8 @@ export const transcribeFromStorage = async (
 export const streamTranscribeFromStorage = async (
   uploadResponse: UploadResponse,
   apiKey: string,
-  onProgress?: ProgressCallback
+  onProgress?: ProgressCallback,
+  onSegment?: (segment: { text: string; timestamp: string }) => void
 ): Promise<TranscriptData> => {
   console.log('streamTranscribeFromStorage called for upload:', uploadResponse.uploadId);
   
@@ -239,6 +240,15 @@ export const streamTranscribeFromStorage = async (
                   
                 case 'chunk_complete':
                   console.log(`Chunk ${eventData.data.chunkIndex + 1} completed`);
+                  // If there are segments in this chunk, pass them to the callback
+                  if (eventData.data.segments && onSegment) {
+                    eventData.data.segments.forEach((segment: any) => {
+                      onSegment({
+                        text: segment.text,
+                        timestamp: segment.timestamp || `${Math.floor(Date.now() / 1000)}`
+                      });
+                    });
+                  }
                   break;
                   
                 case 'complete':
