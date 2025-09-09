@@ -1,8 +1,15 @@
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+// Get allowed origins from environment variable, fallback to wildcard
+const getAllowedOrigins = (): string => {
+  const allowedOrigins = Deno.env.get('ALLOWED_ORIGINS');
+  return allowedOrigins || '*';
 };
+
+const getCorsHeaders = () => ({
+  "Access-Control-Allow-Origin": getAllowedOrigins(),
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey, x-client-info",
+  "Access-Control-Max-Age": "86400", // 24 hours
+});
 
 // Standard response format
 interface ApiResponse<T = any> {
@@ -13,6 +20,7 @@ interface ApiResponse<T = any> {
 }
 
 function createErrorResponse(code: string, message: string, status: number = 500): Response {
+  const corsHeaders = getCorsHeaders();
   const response: ApiResponse = {
     ok: false,
     code,
@@ -29,6 +37,7 @@ function createErrorResponse(code: string, message: string, status: number = 500
 }
 
 function createSuccessResponse<T>(data: T): Response {
+  const corsHeaders = getCorsHeaders();
   const response: ApiResponse<T> = {
     ok: true,
     code: 'SUCCESS',
@@ -45,6 +54,8 @@ function createSuccessResponse<T>(data: T): Response {
 }
 
 Deno.serve(async (req: Request) => {
+  const corsHeaders = getCorsHeaders();
+  
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, {

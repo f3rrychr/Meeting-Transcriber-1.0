@@ -1,8 +1,15 @@
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+// Get allowed origins from environment variable, fallback to wildcard
+const getAllowedOrigins = (): string => {
+  const allowedOrigins = Deno.env.get('ALLOWED_ORIGINS');
+  return allowedOrigins || '*';
 };
+
+const getCorsHeaders = () => ({
+  "Access-Control-Allow-Origin": getAllowedOrigins(),
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey, x-client-info",
+  "Access-Control-Max-Age": "86400", // 24 hours
+});
 
 interface StreamingTranscribeRequest {
   uploadId: string;
@@ -30,6 +37,8 @@ interface StreamEvent {
 }
 
 Deno.serve(async (req: Request) => {
+  const corsHeaders = getCorsHeaders();
+  
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -48,7 +57,7 @@ Deno.serve(async (req: Request) => {
         }),
         {
           status: 405,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...getCorsHeaders(), "Content-Type": "application/json" },
         }
       );
     }
@@ -73,7 +82,7 @@ Deno.serve(async (req: Request) => {
         }),
         {
           status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...getCorsHeaders(), "Content-Type": "application/json" },
         }
       );
     }
@@ -87,7 +96,7 @@ Deno.serve(async (req: Request) => {
         }),
         {
           status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...getCorsHeaders(), "Content-Type": "application/json" },
         }
       );
     }
@@ -140,7 +149,7 @@ Deno.serve(async (req: Request) => {
       }),
       {
         status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...getCorsHeaders(), "Content-Type": "application/json" },
       }
     );
   }
