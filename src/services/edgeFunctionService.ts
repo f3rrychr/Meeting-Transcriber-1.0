@@ -23,10 +23,17 @@ const getOpenAIChunkLimit = (): number => {
 };
 
 export interface ProgressCallback {
-  (phase: 'upload' | 'processing' | 'transcription' | 'summary', 
+  (stage: 'validating' | 'compressing' | 'uploading' | 'transcribing' | 'summarizing' | 'saving', 
    percentage: number, 
    message: string, 
-   details?: { bytesUploaded?: number; totalBytes?: number; chunksReceived?: number; totalChunks?: number }): void;
+   details?: { 
+     bytesUploaded?: number; 
+     totalBytes?: number; 
+     chunksReceived?: number; 
+     totalChunks?: number;
+     stageProgress?: number;
+     isIndeterminate?: boolean;
+   }): void;
 }
 
 interface UploadResponse {
@@ -84,7 +91,7 @@ export const uploadAudioToStorage = async (
 
   const apiUrl = `${SUPABASE_URL}/functions/v1/upload-audio`;
   
-  onProgress?.('upload', 0, 'Uploading to Supabase Storage...', { totalBytes: file.size });
+  onProgress?.('uploading', 0, 'Uploading to Supabase Storage...', { totalBytes: file.size });
   
   try {
     const response = await streamFileUpload(file, apiUrl, {
@@ -94,9 +101,10 @@ export const uploadAudioToStorage = async (
       },
       onProgress: (bytesUploaded, totalBytes) => {
         const percentage = Math.round((bytesUploaded / totalBytes) * 100);
-        onProgress?.('upload', percentage, 'Uploading to storage...', {
+        onProgress?.('uploading', percentage, 'Uploading to storage...', {
           bytesUploaded,
-          totalBytes
+          totalBytes,
+          stageProgress: percentage
         });
       },
       maxFileSize: 500 * 1024 * 1024,
@@ -109,7 +117,7 @@ export const uploadAudioToStorage = async (
     }
     
     const uploadResponse = await response.json() as UploadResponse;
-    onProgress?.('upload', 100, 'Upload complete!');
+    onProgress?.('uploading', 100, 'Upload complete!', { stageProgress: 100 });
     
     return uploadResponse;
     
@@ -141,7 +149,7 @@ export const transcribeFromStorage = async (
 
   const apiUrl = `${SUPABASE_URL}/functions/v1/transcribe-chunked`;
   
-  onProgress?.('processing', 0, 'Starting server-side transcription...', { isIndeterminate: true });
+  onProgress?.('transcribing', 0, 'Starting server-side transcription...', { isIndeterminate: true });
   
   try {
     const response = await fetch(apiUrl, {
@@ -155,7 +163,7 @@ export const transcribeFromStorage = async (
         storagePath: uploadResponse.storagePath,
         apiKey: apiKey,
         chunkSize: 300, // 5 minutes per chunk
-        maxChunkSize: 25 * 1024 * 1024 // 25MB max chunk size
+        maxChunkSize: getOpenAIChunkLimit()
       }),
     });
 
@@ -164,11 +172,11 @@ export const transcribeFromStorage = async (
       throw new EdgeFunctionError(errorData.error || 'Transcription failed', response.status);
     }
 
-    onProgress?.('transcription', 75, 'Processing transcription chunks...');
+    onProgress?.('transcribing', 75, 'Processing transcription chunks...', { stageProgress: 75 });
     
     const transcriptData = await response.json();
     
-    onProgress?.('transcription', 100, 'Transcription complete!');
+    onProgress?.('transcribing', 100, 'Transcription complete!', { stageProgress: 100 });
     return transcriptData as TranscriptData;
     
   } catch (error) {
@@ -200,7 +208,7 @@ export const streamTranscribeFromStorage = async (
 
   const apiUrl = `${SUPABASE_URL}/functions/v1/transcribe-stream`;
   
-  onProgress?.('processing', 0, 'Starting streaming transcription...', { isIndeterminate: true });
+  onProgress?.('transcribing', 0, 'Starting streaming transcription...', { isIndeterminate: true });
   
   try {
     const response = await fetch(apiUrl, {
@@ -214,7 +222,7 @@ export const streamTranscribeFromStorage = async (
         storagePath: uploadResponse.storagePath,
         apiKey: apiKey,
         chunkSize: 300, // 5 minutes per chunk
-        maxChunkSize: 25 * 1024 * 1024 // 25MB max chunk size
+        maxChunkSize: getOpenAIChunkLimit()
       }),
     });
 
@@ -257,9 +265,10 @@ export const streamTranscribeFromStorage = async (
               
               switch (eventData.type) {
                 case 'progress':
-                  onProgress?.('transcription', eventData.data.percentage, eventData.data.message, {
+                  onProgress?.('transcribing', eventData.data.percentage, eventData.data.message, {
                     chunksReceived: eventData.data.chunksReceived,
-                    totalChunks: eventData.data.totalChunks
+                    totalChunks: eventData.data.totalChunks,
+                    stageProgress: eventData.data.percentage
                   });
                   break;
                   
@@ -278,7 +287,7 @@ export const streamTranscribeFromStorage = async (
                   
                 case 'complete':
                   finalTranscript = eventData.data.transcript;
-                  onProgress?.('transcription', 100, 'Streaming transcription complete!');
+                  onProgress?.('transcribing', 100, 'Streaming transcription complete!', { stageProgress: 100 });
                   break;
                   
                 case 'error':
@@ -351,7 +360,7 @@ export const transcribeAudioViaEdgeFunction = async (
   console.log('Sending request to edge function:', apiUrl);
   
   // Initialize progress
-  onProgress?.('upload', 0, 'Preparing streamed upload...', { totalBytes: file.size });
+  onProgress?.('uploading', 0, 'Preparing streamed upload...', { totalBytes: file.size });
   
   // Use retry logic with exponential backoff
   return retryWithBackoff(async () => {
@@ -364,9 +373,10 @@ export const transcribeAudioViaEdgeFunction = async (
         },
         onProgress: (bytesUploaded, totalBytes) => {
           const percentage = Math.round((bytesUploaded / totalBytes) * 100);
-          onProgress?.('upload', percentage, 'Streaming audio file...', {
+          onProgress?.('uploading', percentage, 'Streaming audio file...', {
             bytesUploaded,
-            totalBytes
+            totalBytes,
+            stageProgress: percentage
           });
         },
         maxFileSize: 500 * 1024 * 1024, // 500MB limit
@@ -374,7 +384,7 @@ export const transcribeAudioViaEdgeFunction = async (
       });
       
       // Upload complete, now processing
-      onProgress?.('processing', 0, 'Upload complete, processing on server...', { isIndeterminate: true });
+      onProgress?.('transcribing', 0, 'Upload complete, processing on server...', { isIndeterminate: true });
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
@@ -395,12 +405,12 @@ export const transcribeAudioViaEdgeFunction = async (
         }
       }
       
-      onProgress?.('transcription', 50, 'Transcribing audio with OpenAI Whisper...');
+      onProgress?.('transcribing', 50, 'Transcribing audio with OpenAI Whisper...', { stageProgress: 50 });
       
       const transcriptData = await response.json();
       console.log('Transcription completed via edge function:', transcriptData);
       
-      onProgress?.('transcription', 100, 'Transcription complete!');
+      onProgress?.('transcribing', 100, 'Transcription complete!', { stageProgress: 100 });
       return transcriptData as TranscriptData;
       
     } catch (error) {
@@ -423,13 +433,13 @@ export const transcribeAudioViaEdgeFunction = async (
     retryableStatusCodes: [429, 500, 502, 503, 504],
     onRetry: (attempt, delay, error) => {
       console.log(`Transcription retry attempt ${attempt}, waiting ${delay}ms:`, error.message);
-      onProgress?.('upload', 0, `Retry attempt ${attempt}/4`, { 
+      onProgress?.('uploading', 0, `Retry attempt ${attempt}/4`, { 
         isIndeterminate: true,
         retryAttempt: attempt
       });
     },
     onCountdown: (remainingSeconds) => {
-      onProgress?.('upload', 0, `Retrying in ${remainingSeconds} seconds...`, { 
+      onProgress?.('uploading', 0, `Retrying in ${remainingSeconds} seconds...`, { 
         isIndeterminate: true,
         retryCountdown: remainingSeconds
       });

@@ -92,14 +92,16 @@ export interface StandardError {
 
 // Progress state interface for detailed progress tracking
 export interface ProgressState {
-  phase: 'upload' | 'processing' | 'transcription' | 'summary' | 'complete';
+  stage: 'validating' | 'compressing' | 'uploading' | 'transcribing' | 'summarizing' | 'saving' | 'complete';
   percentage: number;
-  isIndeterminate: boolean;
   message: string;
+  isIndeterminate?: boolean;
   bytesUploaded?: number;
   totalBytes?: number;
   chunksReceived?: number;
   totalChunks?: number;
   retryAttempt?: number;
   retryCountdown?: number;
+  stageProgress?: number; // Progress within current stage (0-100)
+  completedStages?: string[]; // List of completed stages
 }
