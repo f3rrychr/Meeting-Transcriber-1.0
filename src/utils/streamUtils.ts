@@ -309,6 +309,7 @@ export const validateFileStream = async (file: File): Promise<{
   }
 
   if (file.size > 500 * 1024 * 1024) {
+  }
   const fileSizeLimit = getFileSizeLimit();
   if (file.size > fileSizeLimit) {
     const limitMB = Math.round(fileSizeLimit / 1024 / 1024);
