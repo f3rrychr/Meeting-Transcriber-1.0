@@ -4,6 +4,51 @@ const getAllowedOrigins = (): string => {
   return allowedOrigins || '*';
 };
 
+// Runtime environment validation
+interface EnvValidationResult {
+  isValid: boolean;
+  errors: string[];
+}
+
+const validateEnvironment = (): EnvValidationResult => {
+  const errors: string[] = [];
+  
+  // Check SUPABASE_URL
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  if (!supabaseUrl || 
+      supabaseUrl === 'your_supabase_project_url' || 
+      supabaseUrl === 'undefined' ||
+      supabaseUrl === 'null' ||
+      supabaseUrl.includes('placeholder') ||
+      !supabaseUrl.startsWith('https://')) {
+    errors.push('SUPABASE_URL is not properly configured');
+  }
+  
+  // Check SUPABASE_ANON_KEY
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+  if (!supabaseAnonKey || 
+      supabaseAnonKey === 'your_supabase_anon_key' || 
+      supabaseAnonKey === 'undefined' ||
+      supabaseAnonKey === 'null' ||
+      supabaseAnonKey.includes('placeholder') ||
+      !supabaseAnonKey.startsWith('eyJ')) {
+    errors.push('SUPABASE_ANON_KEY is not properly configured');
+  }
+  
+  // Check ALLOWED_ORIGINS (optional but should not be placeholder)
+  const allowedOrigins = Deno.env.get('ALLOWED_ORIGINS');
+  if (allowedOrigins && 
+      (allowedOrigins === 'your_allowed_origins' || 
+       allowedOrigins.includes('placeholder'))) {
+    errors.push('ALLOWED_ORIGINS contains placeholder values');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+};
+
 const getCorsHeaders = () => ({
   "Access-Control-Allow-Origin": getAllowedOrigins(),
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -55,6 +100,17 @@ function createSuccessResponse<T>(data: T): Response {
 
 Deno.serve(async (req: Request) => {
   const corsHeaders = getCorsHeaders();
+  
+  // Validate environment on startup
+  const envValidation = validateEnvironment();
+  if (!envValidation.isValid) {
+    console.error('Environment validation failed:', envValidation.errors);
+    return createErrorResponse(
+      'ENV_VALIDATION_ERROR', 
+      `Environment configuration error: ${envValidation.errors.join(', ')}`,
+      500
+    );
+  }
   
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
