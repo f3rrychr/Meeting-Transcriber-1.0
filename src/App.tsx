@@ -314,7 +314,7 @@ function App() {
       setSummary(summaryData);
       completedStages.push('summarizing');
       
-      // Step 4: Saving to local storage
+      // Step 5: Saving to local storage
       setProgressState({
         stage: 'saving',
         percentage: 95,
