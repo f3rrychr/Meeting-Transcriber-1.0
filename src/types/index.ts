@@ -104,4 +104,6 @@ export interface ProgressState {
   retryCountdown?: number;
   stageProgress?: number; // Progress within current stage (0-100)
   completedStages?: string[]; // List of completed stages
+  totalStages?: number; // Total number of stages in the workflow
+  currentStageIndex?: number; // Index of current stage (0-based)
 }

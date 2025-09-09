@@ -23,17 +23,22 @@ const getOpenAIChunkLimit = (): number => {
 };
 
 export interface ProgressCallback {
-  (stage: 'validating' | 'compressing' | 'uploading' | 'transcribing' | 'summarizing' | 'saving', 
-   percentage: number, 
-   message: string, 
-   details?: { 
-     bytesUploaded?: number; 
-     totalBytes?: number; 
-     chunksReceived?: number; 
-     totalChunks?: number;
-     stageProgress?: number;
-     isIndeterminate?: boolean;
-   }): void;
+  (progressState: {
+    stage: 'validating' | 'compressing' | 'uploading' | 'transcribing' | 'summarizing' | 'saving' | 'complete';
+    percentage: number;
+    message: string;
+    stageProgress?: number;
+    completedStages?: string[];
+    totalStages?: number;
+    currentStageIndex?: number;
+    bytesUploaded?: number;
+    totalBytes?: number;
+    chunksReceived?: number;
+    totalChunks?: number;
+    isIndeterminate?: boolean;
+    retryAttempt?: number;
+    retryCountdown?: number;
+  }): void;
 }
 
 interface UploadResponse {
@@ -91,7 +96,14 @@ export const uploadAudioToStorage = async (
 
   const apiUrl = `${SUPABASE_URL}/functions/v1/upload-audio`;
   
-  onProgress?.('uploading', 0, 'Uploading to Supabase Storage...', { totalBytes: file.size });
+  onProgress?.({
+    stage: 'uploading',
+    percentage: 0,
+    message: 'Uploading to Supabase Storage...',
+    stageProgress: 0,
+    totalBytes: file.size,
+    currentStageIndex: 2
+  });
   
   try {
     const response = await streamFileUpload(file, apiUrl, {
@@ -101,10 +113,14 @@ export const uploadAudioToStorage = async (
       },
       onProgress: (bytesUploaded, totalBytes) => {
         const percentage = Math.round((bytesUploaded / totalBytes) * 100);
-        onProgress?.('uploading', percentage, 'Uploading to storage...', {
+        onProgress?.({
+          stage: 'uploading',
+          percentage: percentage,
+          message: 'Uploading to storage...',
+          stageProgress: percentage,
           bytesUploaded,
           totalBytes,
-          stageProgress: percentage
+          currentStageIndex: 2
         });
       },
       maxFileSize: 500 * 1024 * 1024,
@@ -117,7 +133,14 @@ export const uploadAudioToStorage = async (
     }
     
     const uploadResponse = await response.json() as UploadResponse;
-    onProgress?.('uploading', 100, 'Upload complete!', { stageProgress: 100 });
+    onProgress?.({
+      stage: 'uploading',
+      percentage: 100,
+      message: 'Upload complete!',
+      stageProgress: 100,
+      completedStages: ['validating', 'uploading'],
+      currentStageIndex: 2
+    });
     
     return uploadResponse;
     
@@ -149,7 +172,14 @@ export const transcribeFromStorage = async (
 
   const apiUrl = `${SUPABASE_URL}/functions/v1/transcribe-chunked`;
   
-  onProgress?.('transcribing', 0, 'Starting server-side transcription...', { isIndeterminate: true });
+  onProgress?.({
+    stage: 'transcribing',
+    percentage: 0,
+    message: 'Starting server-side transcription...',
+    stageProgress: 0,
+    isIndeterminate: true,
+    currentStageIndex: 3
+  });
   
   try {
     const response = await fetch(apiUrl, {
@@ -172,11 +202,24 @@ export const transcribeFromStorage = async (
       throw new EdgeFunctionError(errorData.error || 'Transcription failed', response.status);
     }
 
-    onProgress?.('transcribing', 75, 'Processing transcription chunks...', { stageProgress: 75 });
+    onProgress?.({
+      stage: 'transcribing',
+      percentage: 75,
+      message: 'Processing transcription chunks...',
+      stageProgress: 75,
+      currentStageIndex: 3
+    });
     
     const transcriptData = await response.json();
     
-    onProgress?.('transcribing', 100, 'Transcription complete!', { stageProgress: 100 });
+    onProgress?.({
+      stage: 'transcribing',
+      percentage: 100,
+      message: 'Transcription complete!',
+      stageProgress: 100,
+      completedStages: ['validating', 'uploading', 'transcribing'],
+      currentStageIndex: 3
+    });
     return transcriptData as TranscriptData;
     
   } catch (error) {
@@ -208,7 +251,14 @@ export const streamTranscribeFromStorage = async (
 
   const apiUrl = `${SUPABASE_URL}/functions/v1/transcribe-stream`;
   
-  onProgress?.('transcribing', 0, 'Starting streaming transcription...', { isIndeterminate: true });
+  onProgress?.({
+    stage: 'transcribing',
+    percentage: 0,
+    message: 'Starting streaming transcription...',
+    stageProgress: 0,
+    isIndeterminate: true,
+    currentStageIndex: 3
+  });
   
   try {
     const response = await fetch(apiUrl, {
@@ -265,10 +315,14 @@ export const streamTranscribeFromStorage = async (
               
               switch (eventData.type) {
                 case 'progress':
-                  onProgress?.('transcribing', eventData.data.percentage, eventData.data.message, {
+                  onProgress?.({
+                    stage: 'transcribing',
+                    percentage: eventData.data.percentage,
+                    message: eventData.data.message,
+                    stageProgress: eventData.data.percentage,
                     chunksReceived: eventData.data.chunksReceived,
                     totalChunks: eventData.data.totalChunks,
-                    stageProgress: eventData.data.percentage
+                    currentStageIndex: 3
                   });
                   break;
                   
@@ -287,7 +341,14 @@ export const streamTranscribeFromStorage = async (
                   
                 case 'complete':
                   finalTranscript = eventData.data.transcript;
-                  onProgress?.('transcribing', 100, 'Streaming transcription complete!', { stageProgress: 100 });
+                  onProgress?.({
+                    stage: 'transcribing',
+                    percentage: 100,
+                    message: 'Streaming transcription complete!',
+                    stageProgress: 100,
+                    completedStages: ['validating', 'uploading', 'transcribing'],
+                    currentStageIndex: 3
+                  });
                   break;
                   
                 case 'error':
@@ -360,7 +421,14 @@ export const transcribeAudioViaEdgeFunction = async (
   console.log('Sending request to edge function:', apiUrl);
   
   // Initialize progress
-  onProgress?.('uploading', 0, 'Preparing streamed upload...', { totalBytes: file.size });
+  onProgress?.({
+    stage: 'uploading',
+    percentage: 0,
+    message: 'Preparing streamed upload...',
+    stageProgress: 0,
+    totalBytes: file.size,
+    currentStageIndex: 2
+  });
   
   // Use retry logic with exponential backoff
   return retryWithBackoff(async () => {
@@ -373,10 +441,14 @@ export const transcribeAudioViaEdgeFunction = async (
         },
         onProgress: (bytesUploaded, totalBytes) => {
           const percentage = Math.round((bytesUploaded / totalBytes) * 100);
-          onProgress?.('uploading', percentage, 'Streaming audio file...', {
+          onProgress?.({
+            stage: 'uploading',
+            percentage: percentage,
+            message: 'Streaming audio file...',
+            stageProgress: percentage,
             bytesUploaded,
             totalBytes,
-            stageProgress: percentage
+            currentStageIndex: 2
           });
         },
         maxFileSize: 500 * 1024 * 1024, // 500MB limit
@@ -384,7 +456,15 @@ export const transcribeAudioViaEdgeFunction = async (
       });
       
       // Upload complete, now processing
-      onProgress?.('transcribing', 0, 'Upload complete, processing on server...', { isIndeterminate: true });
+      onProgress?.({
+        stage: 'transcribing',
+        percentage: 0,
+        message: 'Upload complete, processing on server...',
+        stageProgress: 0,
+        isIndeterminate: true,
+        completedStages: ['validating', 'uploading'],
+        currentStageIndex: 3
+      });
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
@@ -405,12 +485,25 @@ export const transcribeAudioViaEdgeFunction = async (
         }
       }
       
-      onProgress?.('transcribing', 50, 'Transcribing audio with OpenAI Whisper...', { stageProgress: 50 });
+      onProgress?.({
+        stage: 'transcribing',
+        percentage: 50,
+        message: 'Transcribing audio with OpenAI Whisper...',
+        stageProgress: 50,
+        currentStageIndex: 3
+      });
       
       const transcriptData = await response.json();
       console.log('Transcription completed via edge function:', transcriptData);
       
-      onProgress?.('transcribing', 100, 'Transcription complete!', { stageProgress: 100 });
+      onProgress?.({
+        stage: 'transcribing',
+        percentage: 100,
+        message: 'Transcription complete!',
+        stageProgress: 100,
+        completedStages: ['validating', 'uploading', 'transcribing'],
+        currentStageIndex: 3
+      });
       return transcriptData as TranscriptData;
       
     } catch (error) {
@@ -433,15 +526,25 @@ export const transcribeAudioViaEdgeFunction = async (
     retryableStatusCodes: [429, 500, 502, 503, 504],
     onRetry: (attempt, delay, error) => {
       console.log(`Transcription retry attempt ${attempt}, waiting ${delay}ms:`, error.message);
-      onProgress?.('uploading', 0, `Retry attempt ${attempt}/4`, { 
+      onProgress?.({
+        stage: 'uploading',
+        percentage: 0,
+        message: `Retry attempt ${attempt}/4`,
+        stageProgress: 0,
         isIndeterminate: true,
-        retryAttempt: attempt
+        retryAttempt: attempt,
+        currentStageIndex: 2
       });
     },
     onCountdown: (remainingSeconds) => {
-      onProgress?.('uploading', 0, `Retrying in ${remainingSeconds} seconds...`, { 
+      onProgress?.({
+        stage: 'uploading',
+        percentage: 0,
+        message: `Retrying in ${remainingSeconds} seconds...`,
+        stageProgress: 0,
         isIndeterminate: true,
-        retryCountdown: remainingSeconds
+        retryCountdown: remainingSeconds,
+        currentStageIndex: 2
       });
     }
   });
@@ -520,14 +623,26 @@ export const generateSummaryViaEdgeFunction = async (
     throw new EdgeFunctionError('Invalid transcript data for summary generation', 'INVALID_INPUT');
   }
 
-  onProgress?.('summarizing', 0, 'Generating summary with GPT...', { stageProgress: 0 });
+  onProgress?.({
+    stage: 'summarizing',
+    percentage: 0,
+    message: 'Generating summary with GPT...',
+    stageProgress: 0,
+    currentStageIndex: 4
+  });
   
   const apiUrl = `${SUPABASE_URL}/functions/v1/generate-summary`;
   
   console.log('Sending summary request to edge function:', apiUrl);
 
   try {
-    onProgress?.('summarizing', 25, 'Sending transcript to AI...', { stageProgress: 25 });
+    onProgress?.({
+      stage: 'summarizing',
+      percentage: 25,
+      message: 'Sending transcript to AI...',
+      stageProgress: 25,
+      currentStageIndex: 4
+    });
     
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -542,7 +657,13 @@ export const generateSummaryViaEdgeFunction = async (
     });
 
     console.log('Summary edge function response status:', response.status);
-    onProgress?.('summarizing', 75, 'Processing AI response...', { stageProgress: 75 });
+    onProgress?.({
+      stage: 'summarizing',
+      percentage: 75,
+      message: 'Processing AI response...',
+      stageProgress: 75,
+      currentStageIndex: 4
+    });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
@@ -562,7 +683,14 @@ export const generateSummaryViaEdgeFunction = async (
     const summaryData = await response.json();
     console.log('Summary completed via edge function:', summaryData);
     
-    onProgress?.('summarizing', 100, 'Summary generation complete!', { stageProgress: 100 });
+    onProgress?.({
+      stage: 'summarizing',
+      percentage: 100,
+      message: 'Summary generation complete!',
+      stageProgress: 100,
+      completedStages: ['validating', 'uploading', 'transcribing', 'summarizing'],
+      currentStageIndex: 4
+    });
     return summaryData as SummaryData;
   } catch (error) {
     console.error('Error calling summary edge function:', error);
