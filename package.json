@@ -13,6 +13,7 @@
     "@ffmpeg/ffmpeg": "^0.12.10",
     "@ffmpeg/util": "^0.12.1",
     "@supabase/storage-js": "^2.12.0",
+    "@supabase/supabase-js": "^2.57.2",
     "docx": "^9.5.1",
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.1",
