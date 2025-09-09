@@ -482,7 +482,7 @@ function App() {
           <div className="flex-1 flex items-center justify-center p-8">
             <div className="max-w-md w-full text-center">
               <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              {processingError?.includes('NETWORK_ERROR') && (
+                <X className="w-8 h-8 text-red-500" />
               </div>
               <h2 className="text-2xl font-semibold text-gray-900 mb-2">Processing Failed</h2>
               <div className="text-gray-600 mb-6">
@@ -498,9 +498,9 @@ function App() {
                       Simply upload an audio file without entering API keys to see how the transcription and summary features work.
                     </p>
                   </div>
-              {processingError?.includes('quota') || processingError?.includes('RATE_LIMIT') ? (
+                )}
               </div>
-              ) : processingError?.includes('INVALID_API_KEY') ? (
+              <div className="space-y-3">
                 <button
                   onClick={resetApp}
                   className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
