@@ -4,8 +4,8 @@ const STORAGE_KEY = 'meeting-transcriber-history';
 const STORAGE_SETTINGS_KEY = 'meeting-transcriber-settings';
 
 // Storage limits
-const MAX_RECORDS = 50;
-const MAX_STORAGE_SIZE_MB = 2;
+const MAX_RECORDS = 30;
+const MAX_STORAGE_SIZE_MB = 10;
 const MAX_STORAGE_SIZE_BYTES = MAX_STORAGE_SIZE_MB * 1024 * 1024;
 
 interface StorageSettings {
@@ -70,8 +70,8 @@ export class TranscriptionStorage {
       // Add to beginning of array (most recent first)
       records.unshift(newRecord);
       
-      // Apply LRU cap and size limits
-      const trimmedRecords = this.applyLRUCap(records);
+      // Apply quota limits with automatic cleanup
+      const trimmedRecords = this.enforceQuotaLimits(records);
       
       localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmedRecords));
       this.updateStorageSettings();
@@ -82,16 +82,16 @@ export class TranscriptionStorage {
   }
   
   /**
-   * Apply LRU (Least Recently Used) capping
+   * Enforce quota limits with automatic cleanup
    */
-  private static applyLRUCap(records: TranscriptionRecord[]): TranscriptionRecord[] {
+  private static enforceQuotaLimits(records: TranscriptionRecord[]): TranscriptionRecord[] {
     // Sort by creation time (most recent first)
     const sortedRecords = records.sort((a, b) => b.createdAt - a.createdAt);
     
-    // Apply record count limit
+    // Apply record count limit (30 max)
     let cappedRecords = sortedRecords.slice(0, MAX_RECORDS);
     
-    // Apply size limit
+    // Apply size limit (10MB max)
     let currentSize = this.calculateRecordsSize(cappedRecords);
     while (currentSize > MAX_STORAGE_SIZE_BYTES && cappedRecords.length > 1) {
       cappedRecords.pop(); // Remove oldest record
@@ -99,7 +99,8 @@ export class TranscriptionStorage {
     }
     
     if (cappedRecords.length < records.length) {
-      console.log(`LRU cap applied: ${records.length} → ${cappedRecords.length} records`);
+      const removedCount = records.length - cappedRecords.length;
+      console.log(`Quota enforcement: removed ${removedCount} oldest records (${records.length} → ${cappedRecords.length})`);
     }
     
     return cappedRecords;
@@ -136,6 +137,7 @@ export class TranscriptionStorage {
       const records = this.getTranscriptions();
       const filteredRecords = records.filter(record => record.id !== id);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(filteredRecords));
+      this.updateStorageSettings();
       console.log('Transcription record deleted:', id);
     } catch (error) {
       console.error('Failed to delete transcription record:', error);
@@ -151,7 +153,7 @@ export class TranscriptionStorage {
       const originalSize = this.calculateStorageSize();
       const originalCount = records.length;
       
-      const prunedRecords = this.applyLRUCap(records);
+      const prunedRecords = this.enforceQuotaLimits(records);
       
       localStorage.setItem(STORAGE_KEY, JSON.stringify(prunedRecords));
       this.updateStorageSettings();
@@ -191,6 +193,8 @@ export class TranscriptionStorage {
     sizeMB: number;
     percentUsed: number;
     isNearLimit: boolean;
+    maxRecords: number;
+    maxSizeMB: number;
   } {
     const records = this.getTranscriptions();
     const sizeBytes = this.calculateStorageSize();
@@ -203,7 +207,9 @@ export class TranscriptionStorage {
       sizeBytes,
       sizeMB,
       percentUsed,
-      isNearLimit
+      isNearLimit,
+      maxRecords: MAX_RECORDS,
+      maxSizeMB: MAX_STORAGE_SIZE_MB
     };
   }
 
@@ -260,5 +266,53 @@ export class TranscriptionStorage {
       console.error('Failed to get storage settings:', error);
       return null;
     }
+  }
+
+  /**
+   * Check if storage is approaching limits
+   */
+  static isApproachingLimits(): { 
+    approaching: boolean; 
+    reason?: string; 
+    recordsUsed: number; 
+    sizeUsed: number; 
+  } {
+    const stats = this.getStorageStats();
+    const recordsPercent = (stats.recordCount / MAX_RECORDS) * 100;
+    const sizePercent = stats.percentUsed;
+    
+    if (recordsPercent > 80) {
+      return {
+        approaching: true,
+        reason: `Using ${stats.recordCount}/${MAX_RECORDS} records (${Math.round(recordsPercent)}%)`,
+        recordsUsed: recordsPercent,
+        sizeUsed: sizePercent
+      };
+    }
+    
+    if (sizePercent > 80) {
+      return {
+        approaching: true,
+        reason: `Using ${stats.sizeMB.toFixed(1)}/${MAX_STORAGE_SIZE_MB}MB (${Math.round(sizePercent)}%)`,
+        recordsUsed: recordsPercent,
+        sizeUsed: sizePercent
+      };
+    }
+    
+    return {
+      approaching: false,
+      recordsUsed: recordsPercent,
+      sizeUsed: sizePercent
+    };
+  }
+
+  /**
+   * Get storage limits for display
+   */
+  static getStorageLimits(): { maxRecords: number; maxSizeMB: number } {
+    return {
+      maxRecords: MAX_RECORDS,
+      maxSizeMB: MAX_STORAGE_SIZE_MB
+    };
   }
 }

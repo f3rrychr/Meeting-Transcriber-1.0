@@ -327,6 +327,13 @@ function App() {
       
       // Save transcription to history
       TranscriptionStorage.saveTranscription(file.name, transcriptData, summaryData);
+      
+      // Check if storage is approaching limits and notify user
+      const storageCheck = TranscriptionStorage.isApproachingLimits();
+      if (storageCheck.approaching) {
+        console.warn('Storage approaching limits:', storageCheck.reason);
+      }
+      
       completedStages.push('saving');
       
       // Final completion
@@ -344,8 +351,13 @@ function App() {
       
       // Show success notification
       if ('Notification' in window && Notification.permission === 'granted') {
+        let notificationBody = `Transcription completed for ${file.name}`;
+        if (storageCheck.approaching) {
+          notificationBody += ` (Storage: ${Math.round(Math.max(storageCheck.recordsUsed, storageCheck.sizeUsed))}% used)`;
+        }
+        
         new Notification('Meeting Transcriber', {
-          body: `Transcription completed for ${file.name}`,
+          body: notificationBody,
           icon: '/favicon.ico'
         });
       }

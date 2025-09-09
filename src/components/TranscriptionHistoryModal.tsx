@@ -221,12 +221,12 @@ const TranscriptionHistoryModal: React.FC<TranscriptionHistoryModalProps> = ({
               <div className="grid grid-cols-3 gap-4 text-sm">
                 <div>
                   <span className={storageStats.isNearLimit ? 'text-amber-700' : 'text-blue-700'}>
-                    Records: {storageStats.recordCount}/50
+                    Records: {storageStats.recordCount}/{storageStats.maxRecords}
                   </span>
                 </div>
                 <div>
                   <span className={storageStats.isNearLimit ? 'text-amber-700' : 'text-blue-700'}>
-                    Size: {storageStats.sizeMB.toFixed(2)}/2.0 MB
+                    Size: {storageStats.sizeMB.toFixed(1)}/{storageStats.maxSizeMB} MB
                   </span>
                 </div>
                 <div>
@@ -237,7 +237,7 @@ const TranscriptionHistoryModal: React.FC<TranscriptionHistoryModalProps> = ({
               </div>
               {storageStats.isNearLimit && (
                 <div className="mt-3 text-xs text-amber-700">
-                  ⚠️ Storage is near capacity. Consider clearing old records or optimizing storage.
+                  ⚠️ Storage is near capacity (max {storageStats.maxRecords} records or {storageStats.maxSizeMB}MB). Oldest records will be automatically removed when limits are exceeded.
                 </div>
               )}
             </div>
