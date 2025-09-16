@@ -263,8 +263,18 @@ const ConnectionStatus: React.FC = () => {
                   <li>1. Click "Connect to Supabase" in the top right corner</li>
                   <li>2. Follow the setup wizard to create/connect your project</li>
                   <li>3. Environment variables will be automatically configured</li>
-                  <li>4. Add your OpenAI API key in Settings</li>
+                  <li>4. Database migrations will be applied automatically</li>
+                  <li>5. Edge functions will be deployed</li>
+                  <li>6. Add your OpenAI API key in Settings</li>
                 </ol>
+                {!connectionDetails.canReachEdgeFunctions && isValidUrl && isValidKey && (
+                  <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded">
+                    <p className="text-sm text-blue-800">
+                      <strong>Note:</strong> Environment variables are configured but edge functions may not be deployed yet. 
+                      This is normal for new Supabase projects.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
