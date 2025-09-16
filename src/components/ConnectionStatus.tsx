@@ -113,10 +113,6 @@ const ConnectionStatus: React.FC = () => {
       
       if (error && !error.message.includes('relation "audio_uploads" does not exist')) {
         console.error('Supabase database connectivity test failed:', error);
-        setConnectionDetails(prev => ({
-          ...prev,
-          lastError: error instanceof Error ? error.message : 'Connection test failed'
-        }));
         setSupabaseStatus('disconnected');
         return;
       }
@@ -217,6 +213,31 @@ const ConnectionStatus: React.FC = () => {
           </div>
         </div>
 
+        {/* Database Health Check */}
+        <div className="bg-gray-50 rounded-lg p-4">
+          <h4 className="font-medium text-gray-800 mb-3">Database Health</h4>
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center justify-between">
+              <span>Local Database:</span>
+              <span className={databaseStatus === 'healthy' ? 'text-green-600' : databaseStatus === 'error' ? 'text-red-600' : 'text-blue-600'}>
+                {databaseStatus === 'checking' && '⏳ Checking...'}
+                {databaseStatus === 'healthy' && '✓ Healthy'}
+                {databaseStatus === 'error' && '✗ Error'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Edge Functions:</span>
+              <span className={connectionDetails.canReachEdgeFunctions ? 'text-green-600' : 'text-amber-600'}>
+                {connectionDetails.canReachEdgeFunctions ? '✓ Reachable' : '⚠ Not deployed'}
+              </span>
+            </div>
+            {connectionDetails.lastError && (
+              <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+                <strong>Last Error:</strong> {connectionDetails.lastError}
+              </div>
+            )}
+          </div>
+        </div>
         {/* Connection Details */}
         {envVars.url && (
           <div className="bg-blue-50 rounded-lg p-4">
