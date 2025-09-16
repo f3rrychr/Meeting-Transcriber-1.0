@@ -83,6 +83,11 @@ const ConnectionStatus: React.FC = () => {
 
     if (!isValidUrl || !isValidKey) {
       setSupabaseStatus('disconnected');
+      setConnectionDetails(prev => ({
+        ...prev,
+        canReachEdgeFunctions: false,
+        lastError: !isValidUrl ? 'Invalid Supabase URL' : 'Invalid Supabase key'
+      }));
       return;
     }
 
@@ -90,29 +95,70 @@ const ConnectionStatus: React.FC = () => {
       const { createClient } = await import('@supabase/supabase-js');
       const supabase = createClient(supabaseUrl, supabaseKey);
       
-      // Test edge function connectivity
-      const edgeFunctionUrl = `${supabaseUrl}/functions/v1/health-check`;
-      const edgeResponse = await fetch(edgeFunctionUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${supabaseKey}`,
-        }
-      });
-
-      // Test actual Supabase connectivity
-      const canReachEdgeFunctions = edgeResponse.status !== 404; // 404 means edge functions not deployed
+      // Test edge function connectivity with timeout and error handling
+      let canReachEdgeFunctions = false;
+      let edgeFunctionError = '';
       
-      // Test database connectivity
-      const { data, error } = await supabase.from('audio_uploads').select('count').limit(1);
+      try {
+        const edgeFunctionUrl = `${supabaseUrl}/functions/v1/health-check`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
+        const edgeResponse = await fetch(edgeFunctionUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${supabaseKey}`,
+          },
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        canReachEdgeFunctions = edgeResponse.status === 200;
+        
+        if (!canReachEdgeFunctions) {
+          edgeFunctionError = `Edge function returned ${edgeResponse.status}`;
+        }
+      } catch (edgeError) {
+        if (edgeError instanceof Error) {
+          if (edgeError.name === 'AbortError') {
+            edgeFunctionError = 'Edge function timeout (10s)';
+          } else if (edgeError.message.includes('Failed to fetch')) {
+            edgeFunctionError = 'Edge functions not deployed or unreachable';
+          } else {
+            edgeFunctionError = edgeError.message;
+          }
+        } else {
+          edgeFunctionError = 'Unknown edge function error';
+        }
+      }
+
+      // Test database connectivity with timeout
+      let databaseError = '';
+      try {
+        const { data, error } = await Promise.race([
+          supabase.from('audio_uploads').select('count').limit(1),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Database timeout')), 10000)
+          )
+        ]);
+        
+        if (error && !error.message.includes('relation "audio_uploads" does not exist')) {
+          databaseError = error.message;
+        }
+      } catch (dbError) {
+        if (dbError instanceof Error) {
+          databaseError = dbError.message;
+        }
+      }
       
       setConnectionDetails(prev => ({
         ...prev,
         canReachEdgeFunctions,
-        lastError: error?.message
+        lastError: edgeFunctionError || databaseError || undefined
       }));
       
-      if (error && !error.message.includes('relation "audio_uploads" does not exist')) {
-        console.error('Supabase database connectivity test failed:', error);
+      if (databaseError && !databaseError.includes('relation "audio_uploads" does not exist')) {
+        console.error('Supabase database connectivity test failed:', databaseError);
         setSupabaseStatus('disconnected');
         return;
       }
@@ -121,6 +167,11 @@ const ConnectionStatus: React.FC = () => {
       setSupabaseStatus('connected');
     } catch (error) {
       console.error('Supabase connectivity test failed:', error);
+      setConnectionDetails(prev => ({
+        ...prev,
+        canReachEdgeFunctions: false,
+        lastError: error instanceof Error ? error.message : 'Connection test failed'
+      }));
       setSupabaseStatus('disconnected');
     }
   };
