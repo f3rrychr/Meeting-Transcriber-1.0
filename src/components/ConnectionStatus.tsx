@@ -84,36 +84,35 @@ const ConnectionStatus: React.FC = () => {
     if (!isValidUrl || !isValidKey) {
       setSupabaseStatus('disconnected');
       return;
-        // Test edge function connectivity
-        const edgeFunctionUrl = `${supabaseUrl}/functions/v1/health-check`;
-        const edgeResponse = await fetch(edgeFunctionUrl, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${supabaseKey}`,
-          }
-        });
-    // Test actual Supabase connectivity
-        const canReachEdgeFunctions = edgeResponse.status !== 404; // 404 means edge functions not deployed
-        
-        // Test database connectivity
-        const { data, error } = await supabase.from('audio_uploads').select('count').limit(1);
-        
-        setConnectionDetails(prev => ({
-          ...prev,
-          canReachEdgeFunctions,
-          lastError: error?.message
-        }));
-        
-        if (error && !error.message.includes('relation "audio_uploads" does not exist')) {
-          console.error('Supabase database connectivity test failed:', error);
+    }
+
+    try {
       const { createClient } = await import('@supabase/supabase-js');
       const supabase = createClient(supabaseUrl, supabaseKey);
       
-      // Test basic connectivity with a simple query
+      // Test edge function connectivity
+      const edgeFunctionUrl = `${supabaseUrl}/functions/v1/health-check`;
+      const edgeResponse = await fetch(edgeFunctionUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${supabaseKey}`,
+        }
+      });
+
+      // Test actual Supabase connectivity
+      const canReachEdgeFunctions = edgeResponse.status !== 404; // 404 means edge functions not deployed
+      
+      // Test database connectivity
       const { data, error } = await supabase.from('audio_uploads').select('count').limit(1);
       
-      if (error) {
-        console.error('Supabase connectivity test failed:', error);
+      setConnectionDetails(prev => ({
+        ...prev,
+        canReachEdgeFunctions,
+        lastError: error?.message
+      }));
+      
+      if (error && !error.message.includes('relation "audio_uploads" does not exist')) {
+        console.error('Supabase database connectivity test failed:', error);
         setConnectionDetails(prev => ({
           ...prev,
           lastError: error instanceof Error ? error.message : 'Connection test failed'
@@ -218,31 +217,6 @@ const ConnectionStatus: React.FC = () => {
           </div>
         </div>
 
-        {/* Database Health Check */}
-        <div className="bg-gray-50 rounded-lg p-4">
-          <h4 className="font-medium text-gray-800 mb-3">Database Health</h4>
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center justify-between">
-              <span>Local Database:</span>
-              <span className={databaseStatus === 'healthy' ? 'text-green-600' : databaseStatus === 'error' ? 'text-red-600' : 'text-blue-600'}>
-                {databaseStatus === 'checking' && '⏳ Checking...'}
-                {databaseStatus === 'healthy' && '✓ Healthy'}
-                {databaseStatus === 'error' && '✗ Error'}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Edge Functions:</span>
-              <span className={connectionDetails.canReachEdgeFunctions ? 'text-green-600' : 'text-amber-600'}>
-                {connectionDetails.canReachEdgeFunctions ? '✓ Reachable' : '⚠ Not deployed'}
-              </span>
-            </div>
-            {connectionDetails.lastError && (
-              <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
-                <strong>Last Error:</strong> {connectionDetails.lastError}
-              </div>
-            )}
-          </div>
-        </div>
         {/* Connection Details */}
         {envVars.url && (
           <div className="bg-blue-50 rounded-lg p-4">
@@ -268,18 +242,8 @@ const ConnectionStatus: React.FC = () => {
                   <li>1. Click "Connect to Supabase" in the top right corner</li>
                   <li>2. Follow the setup wizard to create/connect your project</li>
                   <li>3. Environment variables will be automatically configured</li>
-                  <li>4. Database migrations will be applied automatically</li>
-                  <li>5. Edge functions will be deployed</li>
-                  <li>6. Add your OpenAI API key in Settings</li>
+                  <li>4. Add your OpenAI API key in Settings</li>
                 </ol>
-                {!connectionDetails.canReachEdgeFunctions && isValidUrl && isValidKey && (
-                  <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded">
-                    <p className="text-sm text-blue-800">
-                      <strong>Note:</strong> Environment variables are configured but edge functions may not be deployed yet. 
-                      This is normal for new Supabase projects.
-                    </p>
-                  </div>
-                )}
               </div>
             </div>
           </div>
@@ -295,14 +259,6 @@ const ConnectionStatus: React.FC = () => {
                   Supabase is connected and edge functions are accessible. 
                   Make sure you have a valid OpenAI API key in Settings to use real transcription.
                 </p>
-                {!connectionDetails.canReachEdgeFunctions && (
-                  <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded">
-                    <p className="text-xs text-amber-800">
-                      <strong>Note:</strong> Edge functions may still be deploying. 
-                      If transcription fails, wait a few minutes and try again.
-                    </p>
-                  </div>
-                )}
               </div>
             </div>
           </div>
