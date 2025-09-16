@@ -4,28 +4,11 @@ import { ApiResponse } from '../types';
 import { streamFileUpload, validateFileStream, StreamError } from '../utils/streamUtils';
 import { ResumableUploadService, ResumableUploadResult } from './resumableUploadService';
 import { retryWithBackoff, RetryableError } from '../utils/retryUtils';
+import { getFileSizeLimit, getDurationLimit, getOpenAIChunkLimit, RESUMABLE_UPLOAD_THRESHOLD } from '../utils/limits';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Get limits from environment variables with fallbacks
-const getFileSizeLimit = (): number => {
-  const envLimit = import.meta.env.VITE_MAX_FILE_SIZE_MB;
-  return envLimit ? parseInt(envLimit) * 1024 * 1024 : 500 * 1024 * 1024; // Default 500MB
-};
-
-const getDurationLimit = (): number => {
-  const envLimit = import.meta.env.VITE_MAX_DURATION_MINUTES;
-  return envLimit ? parseInt(envLimit) : 180; // Default 180 minutes (3 hours)
-};
-
-const getOpenAIChunkLimit = (): number => {
-  const envLimit = import.meta.env.VITE_OPENAI_CHUNK_SIZE_MB;
-  return envLimit ? parseInt(envLimit) * 1024 * 1024 : 25 * 1024 * 1024; // Default 25MB
-};
-
-// File size threshold for resumable uploads (50MB)
-const RESUMABLE_UPLOAD_THRESHOLD = 50 * 1024 * 1024;
 export interface ProgressCallback {
   (progressState: {
     stage: 'validating' | 'compressing' | 'uploading' | 'transcribing' | 'summarizing' | 'saving' | 'complete';

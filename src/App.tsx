@@ -20,17 +20,7 @@ import { transcribeAudioSegmented, shouldUseSegmentedTranscription, SegmentedTra
 import { AudioProcessor } from './utils/audioUtils';
 import { ResumableUploadService } from './services/resumableUploadService';
 import MeetingsFeature from './features/meetings';
-
-// Get limits from environment variables with fallbacks
-const getFileSizeLimit = (): number => {
-  const envLimit = import.meta.env.VITE_MAX_FILE_SIZE_MB;
-  return envLimit ? parseInt(envLimit) * 1024 * 1024 : 500 * 1024 * 1024; // Default 500MB
-};
-
-const getDurationLimit = (): number => {
-  const envLimit = import.meta.env.VITE_MAX_DURATION_MINUTES;
-  return envLimit ? parseInt(envLimit) : 180; // Default 180 minutes (3 hours)
-};
+import { getFileSizeLimit, getDurationLimit } from './utils/limits';
 
 // Local storage keys
 const STORAGE_KEYS = {
