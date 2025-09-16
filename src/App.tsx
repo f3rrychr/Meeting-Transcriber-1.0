@@ -228,7 +228,7 @@ function App() {
       
       if (!hasSupabaseConnection) {
         setProcessingState('error');
-        setProcessingError('Supabase connection is required for real transcription. Please click "Connect to Supabase" in the top right corner to set up your Supabase project, then add your OpenAI API key in Settings.');
+        setProcessingError('Supabase connection is required for transcription. Please ensure:\n\n1. Click "Connect to Supabase" in the top right corner\n2. Complete the Supabase project setup\n3. Verify environment variables are properly configured\n4. Add your OpenAI API key in Settings\n\nIf you\'ve already connected, try refreshing the page.');
         return;
       }
 
@@ -382,7 +382,7 @@ function App() {
       // Check if Supabase is connected before attempting summary generation
       if (!hasSupabaseConnection) {
         setProcessingState('error');
-        setProcessingError('Supabase connection is required for summary generation. Please click "Connect to Supabase" in the top right corner to set up your Supabase project.');
+        setProcessingError('Supabase connection is required for summary generation. Please ensure:\n\n1. Supabase project is properly connected\n2. Environment variables are configured\n3. Database tables are created\n4. Edge functions are deployed\n\nTry refreshing the page after setup is complete.');
         return;
       }
 

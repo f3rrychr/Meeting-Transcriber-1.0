@@ -3,6 +3,7 @@ import { TranscriptData, SummaryData } from '../types';
 import { ApiResponse } from '../types';
 import { streamFileUpload, validateFileStream, StreamError } from '../utils/streamUtils';
 import { ResumableUploadService, ResumableUploadResult } from './resumableUploadService';
+import { retryWithBackoff, RetryableError } from '../utils/retryUtils';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -117,7 +118,8 @@ export const uploadAudioToStorage = async (
     const response = await streamFileUpload(file, apiUrl, {
       headers: {
         'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        'apiKey': apiKey
+        'apiKey': apiKey,
+        'Content-Type': 'multipart/form-data'
       },
       onProgress: (bytesUploaded, totalBytes) => {
         const percentage = Math.round((bytesUploaded / totalBytes) * 100);
@@ -136,8 +138,25 @@ export const uploadAudioToStorage = async (
     });
     
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-      throw new EdgeFunctionError(errorData.error || 'Upload failed', response.status);
+      const errorText = await response.text().catch(() => 'Unknown error');
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { error: errorText };
+      }
+      
+      console.error('Upload failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorData
+      });
+      
+      throw new EdgeFunctionError(
+        errorData.error || errorData.message || `Upload failed (${response.status})`,
+        'UPLOAD_ERROR',
+        response.status
+      );
     }
     
     const uploadResponse = await response.json() as UploadResponse;
@@ -788,6 +807,8 @@ export const generateSummaryViaEdgeFunction = async (
 };
 
 export const checkSupabaseConnection = (): boolean => {
+  console.log('Checking Supabase connection...');
+  
   // Check if environment variables exist and aren't placeholder values
   const hasUrl = SUPABASE_URL && 
     SUPABASE_URL !== 'your_supabase_project_url' && 
@@ -804,6 +825,13 @@ export const checkSupabaseConnection = (): boolean => {
     !SUPABASE_ANON_KEY.includes('your_') &&
     !SUPABASE_ANON_KEY.includes('placeholder') &&
     SUPABASE_ANON_KEY.startsWith('eyJ');
+  
+  console.log('Supabase connection check result:', {
+    hasValidUrl: hasUrl,
+    hasValidKey: hasKey,
+    urlPrefix: SUPABASE_URL ? SUPABASE_URL.substring(0, 30) + '...' : 'missing',
+    keyPrefix: SUPABASE_ANON_KEY ? SUPABASE_ANON_KEY.substring(0, 10) + '...' : 'missing'
+  });
   
   return !!(hasUrl && hasKey);
 };

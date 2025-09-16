@@ -191,6 +191,24 @@ export class MeetingDatabase extends Dexie {
   async deleteActionItem(id: string): Promise<void> {
     await this.actionItems.delete(id);
   }
+
+  // Health check method
+  async healthCheck(): Promise<{ isHealthy: boolean; error?: string }> {
+    try {
+      // Test basic database operations
+      await this.meetings.limit(1).toArray();
+      await this.actionItems.limit(1).toArray();
+      await this.attachments.limit(1).toArray();
+      
+      return { isHealthy: true };
+    } catch (error) {
+      console.error('Database health check failed:', error);
+      return { 
+        isHealthy: false, 
+        error: error instanceof Error ? error.message : 'Unknown database error' 
+      };
+    }
+  }
 }
 
 // Singleton instance

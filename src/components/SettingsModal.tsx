@@ -158,6 +158,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ apiKeys, onSave, onClose 
               <p>• Click "Connect to Supabase" button in the top right corner</p>
               <p>• Edge functions handle OpenAI API calls server-side</p>
               <p>• This bypasses browser CORS restrictions</p>
+              <p>• Database tables must be created via migrations</p>
+              <p>• Environment variables must be properly configured</p>
             </div>
           </div>
 

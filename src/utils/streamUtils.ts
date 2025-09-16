@@ -184,7 +184,9 @@ export const streamFileUpload = async (
     
     // Set headers
     Object.entries(headers).forEach(([key, value]) => {
-      xhr.setRequestHeader(key, value);
+      if (key !== 'Content-Type') { // Let browser set Content-Type for FormData
+        xhr.setRequestHeader(key, value);
+      }
     });
     
     // Create FormData with the file (this doesn't load the entire file into memory)
@@ -192,8 +194,8 @@ export const streamFileUpload = async (
     formData.append('file', file);
     
     // Add other form fields if needed
-    if (options.headers && 'apiKey' in options.headers) {
-      formData.append('apiKey', options.headers.apiKey);
+    if (headers && 'apiKey' in headers) {
+      formData.append('apiKey', headers.apiKey);
     }
     
     // Send the request

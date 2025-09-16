@@ -131,7 +131,15 @@ const AudioUpload: React.FC<AudioUploadProps> = ({ onFileUpload }) => {
                 
                 <div className="text-xs text-gray-500 space-y-1">
                   <p>Supported formats: {supportedFormats.join(', ')}</p>
-                  <p>Maximum size: {Math.round(getFileSizeLimit() / 1024 / 1024)}MB (≈{Math.round(getDurationLimit() / 60)} hours)</p>
+                  <li>4. Wait for database migrations to complete</li>
+                  <li>5. Wait for edge functions to deploy</li>
+                  <li>6. Add your OpenAI API key in Settings</li>
+                </div>
+                <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded">
+                  <p className="text-xs text-blue-800">
+                    <strong>Troubleshooting:</strong> If connection fails after setup, try refreshing the page. 
+                    New Supabase projects may take a few minutes to fully initialize.
+                  </p>
                 </div>
               </div>
             </div>
